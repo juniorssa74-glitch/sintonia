@@ -1,0 +1,17 @@
+{
+  "name": "sintonia-android",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Casca Android (Capacitor) que abre o site do Sintonia no GitHub Pages",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0"
+  },
+  "scripts": {
+    "icon": "node -e \"const s=require('sharp');s('assets/icon.svg').resize(1024,1024).png().toFile('assets/icon-only.png').then(()=>s('assets/icon.svg').resize(1024,1024).png().toFile('assets/icon-foreground.png')).then(()=>s({create:{width:1024,height:1024,channels:4,background:'#0d0f0e'}}).png().toFile('assets/icon-background.png'))\""
+  }
+}

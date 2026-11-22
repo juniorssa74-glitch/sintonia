@@ -1,0 +1,11 @@
+{
+  "appId": "app.sintonia.streams",
+  "appName": "Sintonia",
+  "webDir": "www",
+  "backgroundColor": "#0d0f0e",
+  "server": {
+    "url": "https://SEU-USUARIO.github.io/sintonia/",
+    "androidScheme": "https"
+  },
+  "android": { "allowMixedContent": false }
+}

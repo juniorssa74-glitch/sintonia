@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f0e">
+<title>Sintonia</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f0e; --bg2:#151816; --card:#1d211f; --card2:#262b28; --line:#2c322f;
+  --text:#f2f5f3; --muted:#9aa49f; --accent:#3ddc6f; --accent-ink:#06210f; --live:#ff4d5e;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#050606;color:var(--text);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:14px;display:flex;justify-content:center}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit}
+img{display:block}
+.app{position:relative;width:100%;max-width:440px;height:100dvh;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+@media(min-width:600px){.app{height:min(900px,96dvh);margin-top:2dvh;border-radius:28px;border:1px solid var(--line);box-shadow:0 30px 80px #000a}}
+.view{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px 150px;scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;flex:none}
+.chip{padding:7px 14px;border-radius:999px;background:var(--card2);font-weight:600;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.livebar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:-4px 0 14px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--live);box-shadow:0 0 0 0 var(--live);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #ff4d5e88}70%{box-shadow:0 0 0 7px #ff4d5e00}100%{box-shadow:0 0 0 0 #ff4d5e00}}
+
+h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
+h2{font-size:19px;font-weight:800;letter-spacing:-.01em;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
+h2 small{font-size:11px;font-weight:600;color:var(--muted);margin-left:auto}
+
+/* recents grid */
+.recents{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rc{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:6px;overflow:hidden;height:52px;text-align:left}
+.rc img,.rc .ph{width:52px;height:52px;object-fit:cover;flex:none;background:var(--card2)}
+.rc span{font-weight:700;font-size:12px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-right:6px}
+
+/* shelves */
+.shelf{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.tile{width:140px;flex:none;text-align:left}
+.tile img,.tile .ph{width:140px;height:140px;border-radius:8px;object-fit:cover;background:var(--card2);margin-bottom:8px}
+.tile.round img,.tile.round .ph{border-radius:50%}
+.tile b{display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile i{display:block;font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.rank{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700}
+.up{color:var(--accent)} .down{color:var(--live)}
+
+/* featured card */
+.feature{display:flex;gap:12px;background:var(--card);border-radius:12px;padding:12px;text-align:left;width:100%}
+.feature img{width:120px;height:120px;border-radius:8px;object-fit:cover;flex:none}
+.feature .meta{display:flex;flex-direction:column;gap:4px;min-width:0}
+.feature .k{font-size:11px;color:var(--muted)}
+.feature b{font-size:15px}
+.feature p{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+/* radio live cards */
+.radio{width:150px;flex:none;background:var(--card);border-radius:12px;padding:10px;text-align:left;position:relative}
+.radio img,.radio .ph{width:100%;aspect-ratio:1;border-radius:8px;object-fit:contain;background:#fff1;margin-bottom:8px}
+.radio b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.radio i{display:block;font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{position:absolute;top:16px;left:16px;background:var(--live);color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.flash{animation:flash 1s}
+@keyframes flash{0%{background:#3ddc6f33}100%{background:var(--card)}}
+
+/* list rows */
+.row{display:flex;align-items:center;gap:12px;padding:7px 0;width:100%;text-align:left}
+.row img,.row .ph{width:48px;height:48px;border-radius:6px;object-fit:cover;flex:none;background:var(--card2)}
+.row.round img{border-radius:50%}
+.row .t{min-width:0;flex:1}
+.row b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[data-pid].playing{color:var(--accent)}
+.row i{display:block;font-style:normal;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.row .num{width:22px;text-align:center;color:var(--muted);font-weight:700;flex:none}
+.icon-btn{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;color:var(--muted);flex:none}
+.icon-btn:hover{color:var(--text)}
+.icon-btn.on{color:var(--accent)}
+svg{width:22px;height:22px;fill:currentColor}
+
+/* search */
+.searchbox{display:flex;align-items:center;gap:10px;background:#fff;color:#111;border-radius:8px;padding:11px 12px;margin:14px 0 4px}
+.searchbox svg{fill:#111}
+.searchbox input{border:0;outline:0;flex:1;background:none;color:#111;font-weight:600}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cat{height:96px;border-radius:8px;padding:12px;font-weight:800;font-size:15px;text-align:left;position:relative;overflow:hidden;color:#fff}
+.cat img{position:absolute;right:-14px;bottom:-6px;width:68px;height:68px;transform:rotate(22deg);border-radius:4px;box-shadow:0 4px 12px #0006}
+
+/* detail header */
+.back{width:36px;height:36px;display:grid;place-items:center;margin:-4px 0 6px -8px}
+.hero{width:220px;height:220px;margin:4px auto 18px;border-radius:6px;object-fit:cover;box-shadow:0 16px 40px #000a;background:var(--card2)}
+.detail-head{display:flex;gap:14px;align-items:flex-end;margin-bottom:12px}
+.detail-head img{width:110px;height:110px;border-radius:8px;object-fit:cover;flex:none}
+.sub{color:var(--muted);font-size:12px;margin-top:4px}
+.actions{display:flex;align-items:center;gap:6px;margin:12px 0 8px}
+.pill{border:1px solid var(--muted);border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700}
+a.pill{color:var(--text);text-decoration:none}
+.pill.on{border-color:var(--accent);color:var(--accent)}
+.bigplay{width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;margin-left:auto}
+.bigplay svg{width:26px;height:26px}
+.ep{padding:14px 0;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.ep b{display:block;font-size:14px;margin-bottom:4px}
+.ep p{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ep .em{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--muted)}
+.ep .em .bigplay{width:34px;height:34px;margin:0;background:var(--text);color:var(--bg)}
+.ep .em .bigplay svg{width:18px;height:18px}
+.tabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin:8px 0 4px}
+.tabs button{padding:10px 0;font-weight:700;color:var(--muted);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--text);border-color:var(--accent)}
+
+/* states */
+.ph{background:linear-gradient(90deg,var(--card) 0,var(--card2) 50%,var(--card) 100%);background-size:200% 100%;animation:shim 1.2s infinite linear}
+@keyframes shim{to{background-position:-200% 0}}
+.empty{color:var(--muted);text-align:center;padding:40px 10px;line-height:1.6}
+.err{color:var(--muted);font-size:12px;padding:8px 0}
+
+/* mini player */
+.mini{position:absolute;left:8px;right:8px;bottom:68px;background:#2a4a35;border-radius:8px;padding:7px 8px;display:none;align-items:center;gap:10px;z-index:5;overflow:hidden;cursor:pointer}
+.mini.show{display:flex}
+.mini img{width:40px;height:40px;border-radius:4px;object-fit:cover;flex:none}
+.mini .t{flex:1;min-width:0}
+.mini b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini i{display:block;font-style:normal;font-size:12px;color:#cfe3d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini .bar{position:absolute;left:8px;right:8px;bottom:0;height:2px;background:#ffffff33;border-radius:2px}
+.mini .bar span{display:block;height:100%;width:0;background:#fff;border-radius:2px}
+
+/* bottom nav */
+.nav{position:absolute;left:0;right:0;bottom:0;height:64px;display:flex;justify-content:space-around;align-items:center;background:linear-gradient(transparent,var(--bg) 35%);padding-top:10px;z-index:4}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--muted);flex:1;min-width:0}
+
+/* ---- streams ---- */
+:root{--viz:#22a04c;--viz-hi:#3ddc6f;--good:#3ddc6f;--bad:#ff6b6b}
+.seg{display:flex;background:var(--card);border-radius:999px;padding:3px;gap:2px;margin:4px 0 14px}
+.seg button{flex:1;padding:7px 0;border-radius:999px;font-weight:700;font-size:13px;color:var(--muted)}
+.seg button.on{background:var(--card2);color:var(--text)}
+.acard{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:12px;padding:12px;width:100%;text-align:left;margin-bottom:10px}
+.acard img,.acard .ph{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none}
+.acard .t{flex:1;min-width:0}
+.acard b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bignum{font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:var(--muted)}
+.chg{font-size:12px;font-weight:700;white-space:nowrap}
+.chg.up{color:var(--good)} .chg.down{color:var(--bad)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.kpi{background:var(--card);border-radius:10px;padding:10px 12px;text-align:left;border:1px solid transparent}
+.kpi.on{border-color:var(--viz-hi)}
+.kpi span{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.kpi b{display:block;font-size:18px;font-weight:800;margin:2px 0;font-variant-numeric:tabular-nums}
+.chart{position:relative;background:var(--card);border-radius:12px;padding:12px 10px 6px;margin-bottom:6px}
+.chart h3{font-size:13px;font-weight:700;margin:0 4px 6px;display:flex;justify-content:space-between;align-items:center}
+.chart h3 button{font-size:11px;color:var(--muted);font-weight:600}
+.chart svg{width:100%;height:auto;display:block}
+.chart .grid{stroke:#ffffff14;stroke-width:1}
+.chart .axis{fill:var(--muted);font-size:9px;font-family:inherit}
+.chart .bar{fill:var(--viz)} .chart .bar.partial{fill:var(--viz);opacity:.45}
+.chart .hit:hover + .bar,.chart .bar.hl{fill:var(--viz-hi);opacity:1}
+.tip{position:absolute;pointer-events:none;background:#fff;color:#111;border-radius:6px;padding:6px 8px;font-size:11px;line-height:1.35;white-space:nowrap;transform:translate(-50%,-100%);display:none;z-index:2;box-shadow:0 4px 12px #0006}
+.tip b{font-size:13px;display:block}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.tbl td{padding:5px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tbl td:last-child{text-align:right}
+.hero-artist{margin:-14px -16px 0;padding:70px 16px 16px;background-size:cover;background-position:center 25%;position:relative}
+.hero-artist::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0d0f0e33,#0d0f0e 95%)}
+.hero-artist>*{position:relative}
+.hero-artist h1{font-size:34px}
+.irow{display:flex;align-items:center;gap:10px;padding:8px 0;width:100%;text-align:left;border-bottom:1px solid var(--line)}
+.irow img,.irow .ph{width:44px;height:44px;border-radius:4px;object-fit:cover;flex:none;background:var(--card2)}
+.irow .num{width:22px;text-align:center;color:var(--muted);font-weight:700;font-size:12px;flex:none}
+.irow .t{flex:1;min-width:0}
+.irow b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.irow i{display:block;font-style:normal;font-size:11px;color:var(--muted)}
+.irow .v{text-align:right;flex:none}
+.irow .v b{font-variant-numeric:tabular-nums}
+.addbox{background:var(--card);border-radius:12px;padding:12px;margin-bottom:14px}
+.addbox input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--text);outline:none}
+.addbox input:focus{border-color:var(--viz-hi)}
+.btn{background:var(--accent);color:var(--accent-ink);font-weight:800;border-radius:999px;padding:8px 16px;font-size:13px}
+.btn.ghost{background:var(--card2);color:var(--text)}
+.filter{width:100%;background:var(--card);border:0;border-radius:8px;padding:9px 12px;color:var(--text);outline:none;margin:8px 0}
+.split{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin:8px 0 6px}
+.split span{display:block;height:100%}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
+.nav button.on{color:var(--text)}
+
+/* full player */
+.full{position:absolute;inset:0;z-index:10;background:linear-gradient(180deg,#2d5a3c 0%,#12251a 55%,var(--bg) 100%);padding:16px 22px 28px;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s ease}
+.full.show{transform:none}
+.full .fh{display:flex;align-items:center;justify-content:space-between;text-align:center}
+.full .fh div{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#cfe3d6}
+.full .fh b{display:block;font-size:13px;text-transform:none;letter-spacing:0;color:#fff;margin-top:2px}
+.full .art{width:100%;aspect-ratio:1;border-radius:8px;object-fit:cover;margin:auto 0 24px;box-shadow:0 20px 50px #0008;background:#ffffff14}
+.full .art.radio-art{object-fit:contain;padding:30px;background:#ffffff14}
+.full .ti{display:flex;align-items:center;gap:10px}
+.full .ti div{flex:1;min-width:0}
+.full .ti h3{font-size:21px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.full .ti p{color:#cfe3d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog{margin:18px 0 4px;height:4px;background:#ffffff33;border-radius:4px;position:relative;cursor:pointer}
+.prog span{position:absolute;left:0;top:0;bottom:0;background:#fff;border-radius:4px}
+.prog span::after{content:"";position:absolute;right:-6px;top:-4px;width:12px;height:12px;border-radius:50%;background:#fff}
+.times{display:flex;justify-content:space-between;font-size:11px;color:#cfe3d6}
+.ctrls{display:flex;align-items:center;justify-content:space-between;margin-top:14px}
+.ctrls .icon-btn{color:#fff;width:48px;height:48px}
+.ctrls .icon-btn svg{width:30px;height:30px}
+.ctrls .pp{width:66px;height:66px;border-radius:50%;background:#fff;color:#000;display:grid;place-items:center}
+.ctrls .pp svg{width:32px;height:32px}
+.livepill{display:inline-flex;align-items:center;gap:6px;background:#0005;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;margin-top:18px;align-self:flex-start}
+.toast{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);background:#fff;color:#111;padding:8px 14px;border-radius:8px;font-weight:600;font-size:13px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <main class="view" id="view"></main>
+
+  <div class="mini" id="mini">
+    <img id="miniArt" alt="">
+    <div class="t"><b id="miniTitle"></b><i id="miniSub"></i></div>
+    <button class="icon-btn" id="miniLike" aria-label="Curtir"></button>
+    <button class="icon-btn" id="miniPlay" aria-label="Tocar/pausar" style="color:#fff"></button>
+    <div class="bar"><span id="miniBar"></span></div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <button data-tab="streams" class="on"><svg viewBox="0 0 24 24"><path d="M4 20h2V10H4zm5 0h2V4H9zm5 0h2v-8h-2zm5 0h2V7h-2z"/></svg>Streams</button>
+    <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>Ouvir</button>
+    <button data-tab="search"><svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>Buscar</button>
+    <button data-tab="library"><svg viewBox="0 0 24 24"><path d="M4 3h2v18H4zm5 0h2v18H9zm4.6 1.2 1.9-.7 6 16.9-1.9.7z"/></svg>Biblioteca</button>
+    <button data-tab="radio"><svg viewBox="0 0 24 24"><path d="M12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-4.9-2.9 1.4 1.4a5 5 0 0 0 0 7l-1.4 1.4a7 7 0 0 1 0-9.8zm9.8 0a7 7 0 0 1 0 9.8l-1.4-1.4a5 5 0 0 0 0-7zM4.2 4.2l1.4 1.4a9 9 0 0 0 0 12.8l-1.4 1.4a11 11 0 0 1 0-15.6zm15.6 0a11 11 0 0 1 0 15.6l-1.4-1.4a9 9 0 0 0 0-12.8z"/></svg>Ao vivo</button>
+  </nav>
+
+  <section class="full" id="full" aria-hidden="true">
+    <div class="fh">
+      <button class="icon-btn" id="fullClose" style="color:#fff" aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M12 15.6 4.7 8.3l1.4-1.4 5.9 5.9 5.9-5.9 1.4 1.4z"/></svg></button>
+      <div>Tocando de<b id="fullFrom"></b></div>
+      <span style="width:36px"></span>
+    </div>
+    <img class="art" id="fullArt" alt="">
+    <div class="ti">
+      <div><h3 id="fullTitle"></h3><p id="fullSub"></p></div>
+      <button class="icon-btn" id="fullLike" aria-label="Curtir"></button>
+    </div>
+    <div id="progWrap">
+      <div class="prog" id="prog"><span id="progFill"></span></div>
+      <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+    </div>
+    <div id="liveWrap" class="livepill" style="display:none"><span class="dot"></span>AO VIVO · <span id="liveVotes"></span></div>
+    <div class="ctrls">
+      <button class="icon-btn" id="btnShuffle" aria-label="Aleatório"><svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4V8h-2.6l-8 9H3v-2h2.6l8-9H17zm0 10l4 4-4 4v-3h-3.4l-2.2-2.5 1.3-1.5 1.8 2H17zM3 7h3.4l2.2 2.5-1.3 1.5-1.8-2H3z"/></svg></button>
+      <button class="icon-btn" id="btnPrev" aria-label="Anterior"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg></button>
+      <button class="pp" id="btnPlay" aria-label="Tocar/pausar"></button>
+      <button class="icon-btn" id="btnNext" aria-label="Próxima"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zm-1.5 7L5 19V5z"/></svg></button>
+      <button class="icon-btn" id="btnRepeat" aria-label="Repetir"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg></button>
+    </div>
+  </section>
+  <div class="toast" id="toast"></div>
+</div>
+<audio id="audio" preload="none"></audio>
+
+<script>
+/* ---------- ícones ---------- */
+const I = {
+  play:'<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
+  heart:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11zm0-2.4c2.4-1.7 6-4.9 6-8.6a2.5 2.5 0 0 0-4.6-1.3L12 10.6l-1.4-1.9A2.5 2.5 0 0 0 6 10c0 3.7 3.6 6.9 6 8.6z"/></svg>',
+  heartOn:'<svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg>',
+  back:'<svg viewBox="0 0 24 24"><path d="M15.4 4.6 8 12l7.4 7.4-1.4 1.4L5.2 12 14 3.2z"/></svg>',
+  search:'<svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>',
+  chev:'<svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7-1.4-1.4 5.6-5.6-5.6-5.6z"/></svg>',
+};
+
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Teste local (node server.js) tem proxy; online (GitHub Pages / APK) acessa direto.
+const HAS_PROXY = ['localhost', '127.0.0.1'].includes(location.hostname);
+const viaProxy = u => (u && HAS_PROXY && /^https:\/\/[^/]+\.(mzstatic\.com|spotifycdn\.com|scdn\.co)\//.test(u)) ? '/img?url=' + encodeURIComponent(u) : u;
+const dataJSON = p => fetch('data/' + p, {cache:'no-cache'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+const big = (u, n=600) => u ? viaProxy(u.replace(/\/\d+x\d+(bb)?\.(jpg|png|webp)/, `/${n}x${n}bb.jpg`)) : '';
+const fmt = s => { if (!isFinite(s)) return '0:00'; s = Math.floor(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+const store = {
+  get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+function ago(ts){ const s=Math.round((Date.now()-ts)/1000); return s<5?'agora':s<60?`há ${s}s`:`há ${Math.floor(s/60)} min`; }
+
+/* ---------- fontes de dados ---------- */
+// fetch com fallback JSONP (iTunes aceita ?callback=)
+let jsonpN = 0;
+function jsonp(url){
+  return new Promise((ok, fail) => {
+    const cb = '__cb' + (++jsonpN), s = document.createElement('script');
+    window[cb] = d => { ok(d); delete window[cb]; s.remove(); };
+    s.onerror = () => { fail(new Error('jsonp')); delete window[cb]; s.remove(); };
+    s.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.head.appendChild(s);
+  });
+}
+// Hosts da Apple passam pelo proxy do server.js (sem CORS no navegador)
+const PROXIED = /^https:\/\/(itunes\.apple\.com|rss\.applemarketingtools\.com)\//;
+async function getJSON(url, allowJsonp){
+  if (PROXIED.test(url) && HAS_PROXY) {
+    try { const r = await fetch('/proxy?url=' + encodeURIComponent(url)); if (r.ok) return await r.json(); } catch {}
+  }
+  try { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return await r.json(); }
+  catch (e) { if (allowJsonp) return jsonp(url); throw e; }
+}
+const cache = new Map();
+async function cached(key, ttl, fn){
+  const c = cache.get(key);
+  if (c && Date.now() - c.t < ttl) return c.v;
+  const v = await fn(); cache.set(key, {t:Date.now(), v}); return v;
+}
+
+const API = {
+  itunes(params){
+    const q = new URLSearchParams({country:'BR', lang:'pt_br', ...params});
+    return getJSON('https://itunes.apple.com/search?' + q, true).then(d => d.results || []);
+  },
+  lookup(params){
+    const q = new URLSearchParams({country:'BR', ...params});
+    return getJSON('https://itunes.apple.com/lookup?' + q, true).then(d => d.results || []);
+  },
+  // Paradas da Apple Music Brasil: coletadas pelo GitHub Actions em data/charts.json
+  charts(){ return cached('charts', 5*60e3, () => dataJSON('charts.json').catch(() => ({}))); },
+  async topSongs(){
+    const c = await API.charts();
+    return c.songs?.length ? c.songs : API.itunes({term:'top brasil', media:'music', entity:'song', limit:30});
+  },
+  async topAlbums(){
+    const c = await API.charts();
+    return c.albums?.length ? c.albums : API.itunes({term:'sertanejo', entity:'album', limit:20});
+  },
+  async topPodcasts(){
+    const c = await API.charts();
+    return c.podcasts?.length ? c.podcasts : API.itunes({term:'podcast', media:'podcast', limit:20});
+  },
+  // Rádios ao vivo — Radio Browser (comunidade, sem chave)
+  radioHost: null,
+  async radios(order='clicktrend', limit=20){
+    const hosts = ['de1.api.radio-browser.info','fi1.api.radio-browser.info','de2.api.radio-browser.info','nl1.api.radio-browser.info'];
+    const q = `countrycode=BR&order=${order}&reverse=true&limit=${limit}&hidebroken=true&is_https=true`;
+    for (const h of (API.radioHost ? [API.radioHost, ...hosts] : hosts)){
+      try { const d = await getJSON(`https://${h}/json/stations/search?${q}`); API.radioHost = h; return d; } catch {}
+    }
+    throw new Error('radio');
+  },
+  async searchRadios(term){
+    const h = API.radioHost || 'de1.api.radio-browser.info';
+    return getJSON(`https://${h}/json/stations/search?name=${encodeURIComponent(term)}&countrycode=BR&order=clickcount&reverse=true&limit=10&hidebroken=true`);
+  },
+  radioClick(uuid){ const h = API.radioHost || 'de1.api.radio-browser.info'; fetch(`https://${h}/json/url/${uuid}`).catch(()=>{}); },
+};
+
+/* ---------- normalização ---------- */
+const songItem = r => ({ kind:'song', id:'s'+r.trackId, title:r.trackName, sub:r.artistName, art:big(r.artworkUrl100), url:r.previewUrl, albumId:r.collectionId, dur:30 });
+const episodeItem = (r, pod) => ({ kind:'episode', id:'e'+r.trackId, title:r.trackName, sub:pod?.collectionName || r.collectionName, art:big(r.artworkUrl600 || r.artworkUrl160 || pod?.artworkUrl100), url:r.episodeUrl, dur:(r.trackTimeMillis||0)/1000, date:r.releaseDate, desc:r.description || r.shortDescription });
+const radioItem = s => ({ kind:'radio', id:'r'+s.stationuuid, uuid:s.stationuuid, title:s.name.trim(), sub:[s.state, s.tags?.split(',').slice(0,2).join(' · ')].filter(Boolean).join(' · ') || 'Rádio', art:s.favicon, url:s.url_resolved || s.url, votes:s.votes, clicks:s.clickcount, trend:s.clicktrend });
+
+/* ---------- estado ---------- */
+const S = {
+  tab:'streams', stack:[], filter:'all', period: store.get('period', 'day'),
+  liked: store.get('liked', []),          // itens curtidos
+  follows: store.get('follows', []),      // podcasts seguidos
+  recents: store.get('recents', []),      // tocados recentemente
+  queue:[], qi:-1, cur:null, from:'', shuffle:false, repeat:false,
+  radioPrev: {}, lastUpdate: 0,
+};
+const isLiked = id => S.liked.some(x => x.id === id);
+function toggleLike(item){
+  if (!item) return;
+  if (isLiked(item.id)) { S.liked = S.liked.filter(x => x.id !== item.id); toast('Removido das curtidas'); }
+  else { S.liked.unshift(item); toast('Adicionado às curtidas'); }
+  store.set('liked', S.liked); syncPlayerUI(); if (S.tab==='library' && !S.stack.length) render();
+}
+function pushRecent(entry){
+  S.recents = [entry, ...S.recents.filter(x => x.key !== entry.key)].slice(0, 8);
+  store.set('recents', S.recents);
+}
+
+/* ---------- player ---------- */
+const audio = $('#audio');
+function playQueue(list, i, from){
+  S.queue = list; S.qi = i; S.from = from || ''; loadCur();
+}
+function loadCur(){
+  const it = S.queue[S.qi]; if (!it) return;
+  S.cur = it;
+  if (!it.url){ toast('Sem áudio disponível'); return; }
+  audio.src = it.url; audio.play().catch(()=>toast('Não foi possível tocar este áudio'));
+  if (it.kind === 'radio') { API.radioClick(it.uuid); pushRecent({key:it.id, type:'radio', title:it.title, art:it.art, item:it}); }
+  syncPlayerUI(); refreshPlayingRows();
+}
+function next(){ if (!S.queue.length) return;
+  if (S.shuffle) S.qi = Math.floor(Math.random()*S.queue.length);
+  else if (S.qi < S.queue.length-1) S.qi++; else if (S.repeat) S.qi = 0; else return;
+  loadCur(); }
+function prev(){ if (audio.currentTime > 3 && S.cur?.kind!=='radio'){ audio.currentTime = 0; return; } if (S.qi > 0){ S.qi--; loadCur(); } }
+function togglePlay(){ if (!S.cur) return; audio.paused ? audio.play().catch(()=>{}) : audio.pause(); }
+audio.addEventListener('play', syncPlayerUI);
+audio.addEventListener('pause', syncPlayerUI);
+audio.addEventListener('ended', next);
+audio.addEventListener('error', () => { if (S.cur) toast('Falha ao carregar o áudio'); });
+audio.addEventListener('timeupdate', () => {
+  const d = isFinite(audio.duration) ? audio.duration : (S.cur?.dur || 0);
+  const p = d ? Math.min(100, audio.currentTime/d*100) : 0;
+  $('#miniBar').style.width = (S.cur?.kind==='radio' ? 100 : p) + '%';
+  $('#progFill').style.width = p + '%';
+  $('#tCur').textContent = fmt(audio.currentTime); $('#tDur').textContent = fmt(d);
+});
+$('#prog').onclick = e => { const r = e.currentTarget.getBoundingClientRect(); const d = audio.duration; if (isFinite(d)) audio.currentTime = (e.clientX - r.left)/r.width*d; };
+
+function syncPlayerUI(){
+  const it = S.cur; if (!it) return;
+  const playing = !audio.paused;
+  $('#mini').classList.add('show');
+  $('#miniArt').src = it.art || ''; $('#miniTitle').textContent = it.title; $('#miniSub').textContent = it.sub;
+  $('#miniPlay').innerHTML = playing ? I.pause : I.play;
+  const liked = isLiked(it.id);
+  for (const b of [$('#miniLike'), $('#fullLike')]) { b.innerHTML = liked ? I.heartOn : I.heart; b.classList.toggle('on', liked); }
+  $('#fullArt').src = it.art || ''; $('#fullArt').classList.toggle('radio-art', it.kind==='radio');
+  $('#fullTitle').textContent = it.title; $('#fullSub').textContent = it.sub;
+  $('#fullFrom').textContent = S.from;
+  $('#btnPlay').innerHTML = playing ? I.pause : I.play;
+  const live = it.kind === 'radio';
+  $('#progWrap').style.display = live ? 'none' : '';
+  $('#liveWrap').style.display = live ? 'inline-flex' : 'none';
+  if (live) $('#liveVotes').textContent = `${(it.clicks||0).toLocaleString('pt-BR')} ouvintes hoje`;
+  $('#btnShuffle').classList.toggle('on', S.shuffle); $('#btnRepeat').classList.toggle('on', S.repeat);
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({title:it.title, artist:it.sub, artwork: it.art ? [{src:it.art, sizes:'600x600'}] : []});
+  }
+}
+function refreshPlayingRows(){
+  document.querySelectorAll('[data-pid]').forEach(el => el.classList.toggle('playing', el.dataset.pid === S.cur?.id));
+}
+$('#mini').onclick = e => { if (e.target.closest('button')) return; openFull(true); };
+$('#miniPlay').onclick = togglePlay; $('#btnPlay').onclick = togglePlay;
+$('#miniLike').onclick = () => toggleLike(S.cur); $('#fullLike').onclick = () => toggleLike(S.cur);
+$('#btnNext').onclick = next; $('#btnPrev').onclick = prev;
+$('#btnShuffle').onclick = () => { S.shuffle = !S.shuffle; syncPlayerUI(); };
+$('#btnRepeat').onclick = () => { S.repeat = !S.repeat; syncPlayerUI(); };
+$('#fullClose').onclick = () => openFull(false);
+function openFull(v){ $('#full').classList.toggle('show', v); $('#full').setAttribute('aria-hidden', !v); }
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('nexttrack', next);
+  navigator.mediaSession.setActionHandler('previoustrack', prev);
+}
+
+/* ---------- navegação ---------- */
+const view = $('#view');
+$('#nav').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.tab = b.dataset.tab; S.stack = []; render(); };
+function go(screen){ S.stack.push(screen); render(); }
+function back(){ S.stack.pop(); render(); }
+let renderId = 0;
+function render(){
+  const id = ++renderId;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
+  view.scrollTop = 0;
+  const top = S.stack[S.stack.length-1];
+  const fn = top ? Screens[top.type] : Screens[S.tab];
+  fn(top || {}, () => id === renderId);
+}
+
+/* ---------- blocos de UI ---------- */
+const ph = n => Array.from({length:n}, () => '<div class="tile"><div class="ph"></div><b>&nbsp;</b></div>').join('');
+const phRows = n => Array.from({length:n}, () => '<div class="row"><div class="ph"></div><div class="t"><b class="ph" style="height:12px;width:60%;border-radius:4px"></b></div></div>').join('');
+const img = (src, alt='') => src ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">` : '<div class="ph" style="animation:none"></div>';
+function songRows(list, from, numbered){
+  return list.map((s, i) => `
+    <div class="row" data-play="${i}">
+      ${numbered ? `<span class="num">${i+1}</span>` : ''}
+      ${img(s.art)}
+      <div class="t"><b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${esc(s.title)}</b><i>${esc(s.sub)}</i></div>
+      <button class="icon-btn ${isLiked(s.id)?'on':''}" data-like="${i}" aria-label="Curtir">${isLiked(s.id)?I.heartOn:I.heart}</button>
+    </div>`).join('');
+}
+function bindSongRows(root, list, from){
+  root.querySelectorAll('[data-play]').forEach(el => el.onclick = e => {
+    const lk = e.target.closest('[data-like]');
+    if (lk) { toggleLike(list[+lk.dataset.like]); const on = isLiked(list[+lk.dataset.like].id); lk.innerHTML = on?I.heartOn:I.heart; lk.classList.toggle('on', on); return; }
+    playQueue(list, +el.dataset.play, from);
+  });
+}
+
+/* ---------- telas ---------- */
+const Screens = {
+  async home(_, alive){
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    const f = S.filter;
+    view.innerHTML = `
+      <div class="top">
+        <div class="avatar">S</div>
+        <div class="chips">
+          ${[['all','Tudo'],['music','Música'],['podcast','Podcasts'],['radio','Rádios']].map(([k,l]) => `<button class="chip ${f===k?'on':''}" data-f="${k}">${l}</button>`).join('')}
+        </div>
+      </div>
+      <h1 style="margin-bottom:12px">${greet}</h1>
+      <div class="livebar"><span class="dot"></span><span>Dados ao vivo · <span id="upd">carregando…</span></span></div>
+      ${S.recents.length && f==='all' ? `<div class="recents" id="recents"></div>` : ''}
+      ${f!=='podcast' && f!=='radio' ? `<h2>Em alta no Brasil <small>Apple Music</small></h2><div class="shelf" id="top">${ph(4)}</div>` : ''}
+      ${f!=='music' && f!=='podcast' ? `<h2><span class="dot"></span>Rádios bombando agora <small>atualiza a cada 30s</small></h2><div class="shelf" id="radios">${ph(4)}</div>` : ''}
+      ${f!=='music' && f!=='radio' ? `<h2>Escolhido pra você</h2><div id="pick"><div class="feature"><div class="ph" style="width:120px;height:120px;border-radius:8px"></div></div></div>
+        <h2>Podcasts mais ouvidos</h2><div class="shelf" id="pods">${ph(4)}</div>` : ''}
+      ${f!=='podcast' && f!=='radio' ? `<h2>Álbuns mais tocados</h2><div class="shelf" id="albums">${ph(4)}</div>` : ''}
+    `;
+    view.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+
+    // recentes
+    const rec = $('#recents');
+    if (rec) {
+      rec.innerHTML = S.recents.slice(0,6).map((r,i) => `<button class="rc" data-r="${i}">${img(r.art)}<span>${esc(r.title)}</span></button>`).join('');
+      rec.onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
+        if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
+    }
+
+    // músicas em alta
+    if ($('#top')) API.topSongs().then(list => {
+      if (!alive() || !$('#top')) return;
+      const items = list.map(songItem);
+      $('#top').innerHTML = items.map((s,i) => `<button class="tile" data-i="${i}">${img(s.art)}<b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${i+1}. ${esc(s.title)}</b><i>${esc(s.sub)}</i></button>`).join('');
+      $('#top').onclick = e => { const b = e.target.closest('[data-i]'); if (b) playQueue(items, +b.dataset.i, 'Em alta no Brasil'); };
+    }).catch(() => alive() && $('#top') && ($('#top').innerHTML = '<p class="err">Não foi possível carregar as paradas agora.</p>'));
+
+    if ($('#radios')) loadRadios(alive);
+
+    if ($('#pods')) API.topPodcasts().then(list => {
+      if (!alive() || !$('#pods')) return;
+      $('#pods').innerHTML = list.map((p,i) => `<button class="tile" data-i="${i}">${img(big(p.artworkUrl100,400))}<b>${esc(p.collectionName)}</b><i>${esc(p.artistName)}</i></button>`).join('');
+      $('#pods').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:list[+b.dataset.i].collectionId}); };
+      // destaque: um podcast aleatório do top + último episódio
+      const p = list[Math.floor(Math.random()*Math.min(10, list.length))];
+      if (p) API.lookup({id:p.collectionId, entity:'podcastEpisode', limit:2}).then(res => {
+        if (!alive() || !$('#pick')) return;
+        const ep = res.find(r => r.kind === 'podcast-episode' || r.wrapperType === 'podcastEpisode');
+        if (!ep) { $('#pick').remove(); return; }
+        const item = episodeItem(ep, p);
+        $('#pick').innerHTML = `<button class="feature">${img(big(p.artworkUrl100,400))}<div class="meta"><span class="k">Podcast · Episódio mais recente</span><b>${esc(item.title)}</b><span class="k">${esc(p.collectionName)}</span><p>${esc(item.desc||'')}</p></div></button>`;
+        $('#pick').onclick = () => go({type:'podcast', id:p.collectionId});
+      }).catch(()=>{});
+    }).catch(() => alive() && $('#pods') && ($('#pods').innerHTML = '<p class="err">Não foi possível carregar os podcasts.</p>'));
+
+    if ($('#albums')) API.topAlbums().then(list => {
+      if (!alive() || !$('#albums')) return;
+      $('#albums').innerHTML = list.map((a,i) => `<button class="tile" data-i="${i}">${img(big(a.artworkUrl100,400))}<b>${esc(a.collectionName)}</b><i>${esc(a.artistName)}</i></button>`).join('');
+      $('#albums').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'album', id:list[+b.dataset.i].collectionId}); };
+    }).catch(() => {});
+  },
+
+  async search(_, alive){
+    const cats = [
+      ['Sertanejo','#27856a'],['Funk','#8c1932'],['Pagode','#e8115b'],['MPB','#148a08'],
+      ['Forró','#bc5900'],['Pop','#477d95'],['Rock','#e61e32'],['Gospel','#503750'],
+      ['Rap','#ba5d07'],['Eletrônica','#0d73ec'],['Axé','#af2896'],['Samba','#1e3264'],
+    ];
+    view.innerHTML = `
+      <h1 style="margin-top:6px">Buscar</h1>
+      <label class="searchbox">${I.search}<input id="q" placeholder="O que você quer ouvir?" autocomplete="off" enterkeyhint="search"></label>
+      <div id="sres"><h2>Navegar por gênero</h2><div class="cats">${cats.map(([n,c]) => `<button class="cat" style="background:${c}" data-g="${n}">${n}</button>`).join('')}</div></div>`;
+    view.querySelectorAll('[data-g]').forEach(b => b.onclick = () => go({type:'genre', name:b.dataset.g, color:b.style.background}));
+    // capas nos gêneros
+    cats.forEach(([n]) => API.itunes({term:n, entity:'album', limit:1}).then(r => {
+      const b = view.querySelector(`[data-g="${n}"]`); if (b && r[0]) b.insertAdjacentHTML('beforeend', `<img src="${esc(big(r[0].artworkUrl100,200))}" alt="">`);
+    }).catch(()=>{}));
+    const q = $('#q'); let t;
+    q.oninput = () => { clearTimeout(t); t = setTimeout(() => doSearch(q.value.trim(), alive), 350); };
+  },
+
+  library(){
+    const liked = S.liked;
+    view.innerHTML = `
+      <div class="top"><div class="avatar">S</div><h1>Sua Biblioteca</h1></div>
+      <button class="row" id="likedRow"><div style="width:48px;height:48px;border-radius:6px;background:linear-gradient(135deg,#4c2fd6,#9ad8c3);display:grid;place-items:center;flex:none">${I.heartOn}</div>
+        <div class="t"><b>Curtidas</b><i>Playlist · ${liked.length} ${liked.length===1?'item':'itens'}</i></div></button>
+      <h2>Podcasts que você segue</h2>
+      <div id="follows">${S.follows.length ? S.follows.map((p,i) => `<button class="row" data-i="${i}">${img(p.art)}<div class="t"><b>${esc(p.title)}</b><i>Podcast · ${esc(p.sub)}</i></div></button>`).join('') : '<p class="empty">Siga um podcast para ver novos episódios aqui.</p>'}</div>
+      <h2>Tocados recentemente</h2>
+      <div id="recs">${S.recents.length ? S.recents.map((r,i) => `<button class="row" data-r="${i}">${img(r.art)}<div class="t"><b>${esc(r.title)}</b><i>${{radio:'Rádio ao vivo',album:'Álbum',podcast:'Podcast'}[r.type]||''}</i></div></button>`).join('') : '<p class="empty">Nada por aqui ainda.</p>'}</div>`;
+    $('#likedRow').onclick = () => go({type:'liked'});
+    $('#follows').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:S.follows[+b.dataset.i].id}); };
+    $('#recs').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
+      if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
+  },
+
+  radio(_, alive){
+    view.innerHTML = `
+      <h1 style="margin-top:6px">Ao vivo</h1>
+      <div class="livebar" style="margin-top:8px"><span class="dot"></span><span>Ranking de rádios do Brasil · <span id="upd">carregando…</span></span></div>
+      <div class="chips" style="margin-bottom:8px">
+        <button class="chip on" data-o="clicktrend">Subindo agora</button><button class="chip" data-o="clickcount">Mais ouvidas</button><button class="chip" data-o="votes">Mais votadas</button>
+      </div>
+      <div id="rlist">${phRows(8)}</div>`;
+    let order = 'clicktrend';
+    view.querySelectorAll('[data-o]').forEach(b => b.onclick = () => {
+      order = b.dataset.o; view.querySelectorAll('[data-o]').forEach(x => x.classList.toggle('on', x===b)); load(true);
+    });
+    const load = async (reset) => {
+      try {
+        const list = (await API.radios(order, 30)).map(radioItem);
+        if (!alive() || !$('#rlist')) return;
+        const prevPos = reset ? {} : Object.fromEntries([...view.querySelectorAll('[data-rid]')].map((el,i) => [el.dataset.rid, i]));
+        $('#rlist').innerHTML = list.map((s,i) => {
+          const was = prevPos[s.id];
+          const mv = was === undefined || reset ? '' : was > i ? `<span class="rank up">▲${was-i}</span>` : was < i ? `<span class="rank down">▼${i-was}</span>` : '';
+          return `<button class="row ${was!==undefined && was!==i ? 'flash':''}" data-i="${i}" data-rid="${s.id}"><span class="num">${i+1}</span>${img(s.art)}
+            <div class="t"><b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${esc(s.title)}</b><i>${esc(s.sub)}</i></div>
+            <div style="text-align:right;font-size:11px;color:var(--muted);flex:none">${mv}<div>${order==='votes' ? s.votes.toLocaleString('pt-BR')+' votos' : (order==='clicktrend' ? (s.trend>0?'+':'')+s.trend+' hoje' : s.clicks.toLocaleString('pt-BR')+' ouvintes')}</div></div></button>`;
+        }).join('');
+        $('#rlist').onclick = e => { const b = e.target.closest('[data-i]'); if (b) playQueue(list, +b.dataset.i, 'Rádios ao vivo'); };
+        S.lastUpdate = Date.now();
+      } catch { if (alive() && $('#rlist')) $('#rlist').innerHTML = '<p class="empty">Não foi possível conectar ao serviço de rádios agora. Tentando de novo em 30s…</p>'; }
+    };
+    load(true);
+    poll(alive, () => load(false));
+  },
+
+  async album({id}, alive){
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><div class="hero ph"></div>${phRows(6)}`;
+    try {
+      const res = await API.lookup({id, entity:'song'});
+      if (!alive()) return;
+      const al = res.find(r => r.wrapperType === 'collection') || res[0];
+      const songs = res.filter(r => r.wrapperType === 'track' && r.previewUrl).map(songItem);
+      pushRecent({key:'a'+id, type:'album', id, title:al.collectionName, art:big(al.artworkUrl100,200)});
+      view.innerHTML = `
+        <button class="back" onclick="back()">${I.back}</button>
+        <img class="hero" src="${esc(big(al.artworkUrl100))}" alt="">
+        <h1>${esc(al.collectionName)}</h1>
+        <div class="sub" style="font-weight:700;color:var(--text);margin-top:8px">${esc(al.artistName)}</div>
+        <div class="sub">Álbum · ${al.releaseDate ? new Date(al.releaseDate).getFullYear() : ''} · ${songs.length} faixas · prévias de 30s</div>
+        <div class="actions"><button class="icon-btn" id="shuf"><svg viewBox="0 0 24 24"><path d="M17 3l4 4-4 4V8h-2.6l-8 9H3v-2h2.6l8-9H17zm0 10l4 4-4 4v-3h-3.4l-2.2-2.5 1.3-1.5 1.8 2H17zM3 7h3.4l2.2 2.5-1.3 1.5-1.8-2H3z"/></svg></button><button class="bigplay" id="pa">${I.play}</button></div>
+        <div id="songs">${songRows(songs)}</div>`;
+      bindSongRows($('#songs'), songs, al.collectionName);
+      $('#pa').onclick = () => playQueue(songs, 0, al.collectionName);
+      $('#shuf').onclick = () => { S.shuffle = true; playQueue(songs, Math.floor(Math.random()*songs.length), al.collectionName); };
+    } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Não foi possível abrir o álbum.</p>`; }
+  },
+
+  async podcast({id}, alive){
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button>${phRows(6)}`;
+    try {
+      const res = await API.lookup({id, entity:'podcastEpisode', limit:30});
+      if (!alive()) return;
+      const pod = res.find(r => r.wrapperType === 'track' && r.kind === 'podcast') || res[0];
+      const eps = res.filter(r => r.wrapperType === 'podcastEpisode').map(r => episodeItem(r, pod));
+      const art = big(pod.artworkUrl600 || pod.artworkUrl100, 400);
+      pushRecent({key:'p'+id, type:'podcast', id, title:pod.collectionName, art:big(art,200)});
+      const following = () => S.follows.some(f => f.id === id);
+      view.innerHTML = `
+        <button class="back" onclick="back()">${I.back}</button>
+        <div class="detail-head"><img src="${esc(art)}" alt=""><div><h1 style="font-size:20px">${esc(pod.collectionName)}</h1><div class="sub" style="color:var(--text);font-weight:600">${esc(pod.artistName)}</div></div></div>
+        <div class="sub">${esc(pod.primaryGenreName||'Podcast')} · ${pod.trackCount||eps.length} episódios</div>
+        <div class="actions"><button class="pill" id="fol"></button></div>
+        <div class="tabs"><button class="on">Episódios</button></div>
+        <div id="eps">${eps.map((e,i) => `
+          <div class="ep" data-i="${i}">
+            <b data-pid="${e.id}" class="${S.cur?.id===e.id?'playing':''}">${esc(e.title)}</b>
+            <p>${esc(e.desc||'')}</p>
+            <div class="em"><span>${e.date ? new Date(e.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : ''} · ${Math.round(e.dur/60)} min</span>
+              <span style="display:flex;gap:4px;align-items:center"><button class="icon-btn ${isLiked(e.id)?'on':''}" data-like="${i}">${isLiked(e.id)?I.heartOn:I.heart}</button><button class="bigplay" data-play="${i}">${I.play}</button></span></div>
+          </div>`).join('') || '<p class="empty">Nenhum episódio encontrado.</p>'}</div>`;
+      const fol = $('#fol');
+      const paint = () => { const on = following(); fol.textContent = on ? 'Seguindo' : 'Seguir'; fol.classList.toggle('on', on); };
+      paint();
+      fol.onclick = () => {
+        if (following()) S.follows = S.follows.filter(f => f.id !== id);
+        else S.follows.unshift({id, title:pod.collectionName, sub:pod.artistName, art:big(art,200)});
+        store.set('follows', S.follows); paint();
+      };
+      $('#eps').onclick = e => {
+        const lk = e.target.closest('[data-like]');
+        if (lk) { const it = eps[+lk.dataset.like]; toggleLike(it); lk.innerHTML = isLiked(it.id)?I.heartOn:I.heart; lk.classList.toggle('on', isLiked(it.id)); return; }
+        const p = e.target.closest('[data-play]'); if (p) playQueue(eps, +p.dataset.play, pod.collectionName);
+      };
+    } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Não foi possível abrir o podcast.</p>`; }
+  },
+
+  async genre({name, color}, alive){
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button>
+      <div style="background:${color};margin:0 -16px;padding:40px 16px 18px"><h1 style="font-size:32px">${esc(name)}</h1></div>
+      <h2>Músicas</h2><div id="gs">${phRows(8)}</div><h2>Álbuns</h2><div class="shelf" id="ga">${ph(4)}</div>`;
+    try {
+      const [songs, albums] = await Promise.all([
+        API.itunes({term:name, media:'music', entity:'song', limit:25}),
+        API.itunes({term:name, entity:'album', limit:15}),
+      ]);
+      if (!alive()) return;
+      const items = songs.filter(s => s.previewUrl).map(songItem);
+      $('#gs').innerHTML = songRows(items); bindSongRows($('#gs'), items, name);
+      $('#ga').innerHTML = albums.map((a,i) => `<button class="tile" data-i="${i}">${img(big(a.artworkUrl100,400))}<b>${esc(a.collectionName)}</b><i>${esc(a.artistName)}</i></button>`).join('');
+      $('#ga').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'album', id:albums[+b.dataset.i].collectionId}); };
+    } catch { if (alive()) $('#gs').innerHTML = '<p class="err">Falha ao carregar.</p>'; }
+  },
+
+  liked(){
+    const list = S.liked;
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button>
+      <div style="background:linear-gradient(135deg,#4c2fd6,#2a6b55);margin:0 -16px;padding:60px 16px 18px"><h1 style="font-size:30px">Curtidas</h1><div class="sub" style="color:#ddd">${list.length} itens</div></div>
+      ${list.length ? `<div class="actions"><button class="bigplay" id="pa">${I.play}</button></div><div id="ls">${songRows(list)}</div>` : '<p class="empty">Toque no ♥ de uma música, episódio ou rádio para salvar aqui.</p>'}`;
+    if (list.length) { bindSongRows($('#ls'), list, 'Curtidas'); $('#pa').onclick = () => playQueue(list, 0, 'Curtidas'); }
+  },
+};
+window.back = back;
+
+/* ---------- busca ---------- */
+async function doSearch(term, alive){
+  const box = $('#sres'); if (!box) return;
+  if (!term) { render(); return; }
+  box.innerHTML = `<h2>Músicas</h2>${phRows(5)}`;
+  try {
+    const [songs, albums, pods, radios] = await Promise.all([
+      API.itunes({term, media:'music', entity:'song', limit:10}),
+      API.itunes({term, entity:'album', limit:10}),
+      API.itunes({term, media:'podcast', limit:8}),
+      API.searchRadios(term).catch(() => []),
+    ]);
+    if (!alive() || $('#q')?.value.trim() !== term) return;
+    const items = songs.filter(s => s.previewUrl).map(songItem);
+    const rad = radios.map(radioItem);
+    box.innerHTML = `
+      ${items.length ? `<h2>Músicas</h2><div id="ss">${songRows(items)}</div>` : ''}
+      ${albums.length ? `<h2>Álbuns</h2><div class="shelf" id="sa">${albums.map((a,i) => `<button class="tile" data-i="${i}">${img(big(a.artworkUrl100,400))}<b>${esc(a.collectionName)}</b><i>${esc(a.artistName)}</i></button>`).join('')}</div>` : ''}
+      ${pods.length ? `<h2>Podcasts</h2><div class="shelf" id="sp">${pods.map((p,i) => `<button class="tile" data-i="${i}">${img(big(p.artworkUrl600||p.artworkUrl100,400))}<b>${esc(p.collectionName)}</b><i>${esc(p.artistName)}</i></button>`).join('')}</div>` : ''}
+      ${rad.length ? `<h2>Rádios</h2><div id="sr">${rad.map((s,i) => `<button class="row" data-i="${i}">${img(s.art)}<div class="t"><b data-pid="${s.id}">${esc(s.title)}</b><i>Rádio ao vivo · ${esc(s.sub)}</i></div></button>`).join('')}</div>` : ''}
+      ${!items.length && !albums.length && !pods.length && !rad.length ? `<p class="empty">Nada encontrado para “${esc(term)}”.</p>` : ''}`;
+    if ($('#ss')) bindSongRows($('#ss'), items, `Busca: ${term}`);
+    if ($('#sa')) $('#sa').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'album', id:albums[+b.dataset.i].collectionId}); };
+    if ($('#sp')) $('#sp').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:pods[+b.dataset.i].collectionId}); };
+    if ($('#sr')) $('#sr').onclick = e => { const b = e.target.closest('[data-i]'); if (b) playQueue(rad, +b.dataset.i, 'Rádio ao vivo'); };
+  } catch { if (alive()) box.innerHTML = '<p class="empty">Erro na busca. Verifique sua conexão.</p>'; }
+}
+
+/* ---------- rádios na home (tempo real) ---------- */
+function loadRadios(alive){
+  const run = async () => {
+    try {
+      const list = (await API.radios('clicktrend', 15)).map(radioItem);
+      const el = $('#radios'); if (!alive() || !el) return;
+      const prev = S.radioPrev;
+      el.innerHTML = list.map((s,i) => {
+        const was = prev[s.id];
+        const mv = was === undefined ? '' : was > i ? `<span class="rank up">▲${was-i}</span>` : was < i ? `<span class="rank down">▼${i-was}</span>` : '';
+        return `<button class="radio ${was!==undefined && was!==i?'flash':''}" data-i="${i}"><span class="badge">AO VIVO</span>${img(s.art)}<b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${esc(s.title)}</b><i>${mv} ${s.trend>0?'+':''}${s.trend} ouvintes hoje</i></button>`;
+      }).join('');
+      S.radioPrev = Object.fromEntries(list.map((s,i) => [s.id, i]));
+      el.onclick = e => { const b = e.target.closest('[data-i]'); if (b) playQueue(list, +b.dataset.i, 'Rádios ao vivo'); };
+      S.lastUpdate = Date.now();
+    } catch { const el = $('#radios'); if (alive() && el) el.innerHTML = '<p class="err">Serviço de rádios indisponível. Tentando de novo…</p>'; }
+  };
+  run(); poll(alive, run);
+}
+
+/* ---------- loop de atualização ---------- */
+function poll(alive, fn){
+  const h = setInterval(() => { if (!alive()) return clearInterval(h); if (!document.hidden) fn(); }, 30000);
+}
+setInterval(() => { const u = $('#upd'); if (u) u.textContent = S.lastUpdate ? `atualizado ${ago(S.lastUpdate)}` : 'carregando…'; }, 1000);
+// a cada 5 min, renova as paradas na home (cache expira)
+setInterval(() => { if (S.tab==='home' && !S.stack.length && !document.hidden) { cache.delete('top'); } }, 5*60e3);
+</script>
+
+<script>
+/* =================== STREAMS: acompanhamento diário =================== */
+const P = { day:{label:'Diário', short:'Hoje', days:1}, week:{label:'Semanal', short:'7 dias', days:7}, month:{label:'Mensal', short:'30 dias', days:30} };
+const nf = new Intl.NumberFormat('pt-BR');
+function fmtN(n){
+  if (n == null) return '—';
+  const a = Math.abs(n), f = (v, d) => v.toLocaleString('pt-BR', {maximumFractionDigits:d, minimumFractionDigits:0});
+  if (a >= 1e9) return f(n/1e9, 2) + ' bi';
+  if (a >= 1e6) return f(n/1e6, a >= 1e8 ? 0 : 1) + ' mi';
+  if (a >= 1e3) return f(n/1e3, 0) + ' mil';
+  return nf.format(n);
+}
+const fmtDate = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}`; };
+const fmtDateLong = d => new Date(d+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'short', year:'numeric'});
+function chg(c){ if (c == null) return ''; const up = c >= 0; return `<span class="chg ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(c*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>`; }
+function coverage(st){ return st.complete ? '' : `<span class="note">parcial · ${st.covered} de ${st.days} dias coletados</span>`; }
+const pic = u => esc(viaProxy(u) || '');
+const toSeries = arr => arr.map(([date, t, d]) => ({date, t, d}));
+// Pedidos de adicionar/remover viram uma issue no repositório; o GitHub Actions processa.
+let REPO = null;
+function issueLink(action, id, name){
+  if (!REPO) { toast('Disponível na versão online (GitHub)'); return; }
+  const title = `${action} ${id}: ${name}`;
+  const body = `Pedido feito pelo app Sintonia.\n\nAo enviar esta issue, a coleta roda e a lista de artistas é atualizada em ~2 minutos.`;
+  window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, '_blank');
+  toast('Envie a issue no GitHub para confirmar');
+}
+function nextRun(){ const n = new Date(); const h = n.getUTCHours(); const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), h - h % 3 + 3, 15)); return d; }
+let INDEX = null;
+async function searchIndex(q){
+  INDEX ??= await dataJSON('artist-index.json').catch(() => []);
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(), nq = norm(q);
+  return INDEX.filter(a => norm(a[1]).includes(nq)).slice(0, 15).map(([id, name, totalM]) => ({id, name, totalM}));
+}
+function periodSeg(onChange){
+  return `<div class="seg" id="seg">${Object.entries(P).map(([k,v]) => `<button data-p="${k}" class="${S.period===k?'on':''}">${v.label}</button>`).join('')}</div>`;
+}
+function bindSeg(after){ $('#seg').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; S.period = b.dataset.p; store.set('period', S.period); after(); }; }
+
+/* ---------- agregação para o gráfico ---------- */
+function buckets(series, period){
+  const DAYMS = 864e5, T = d => Date.parse(d+'T00:00:00Z');
+  if (!series.length) return [];
+  if (period === 'day') return series.slice(-30).map(s => ({label:fmtDate(s.date), full:fmtDateLong(s.date), v:s.d, partial:false}));
+  if (period === 'week'){
+    const lastT = T(series[series.length-1].date), map = new Map();
+    for (const s of series){ const k = Math.floor((lastT - T(s.date))/(7*DAYMS)); const b = map.get(k) || {v:0,n:0,end:s.date,start:s.date}; b.v += s.d; b.n++; if (s.date > b.end) b.end = s.date; if (s.date < b.start) b.start = s.date; map.set(k, b); }
+    return [...map.entries()].sort((a,b) => b[0]-a[0]).slice(-12).map(([,b]) => ({label:fmtDate(b.end), full:`Semana até ${fmtDateLong(b.end)} (${b.n} de 7 dias)`, v:b.v, partial:b.n<7}));
+  }
+  const map = new Map();
+  for (const s of series){ const k = s.date.slice(0,7); const b = map.get(k) || {v:0,n:0}; b.v += s.d; b.n++; map.set(k, b); }
+  return [...map.entries()].sort().slice(-12).map(([k,b]) => {
+    const [y,m] = k.split('-').map(Number), dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const name = new Date(Date.UTC(y, m-1, 15)).toLocaleDateString('pt-BR',{month:'short', year:'2-digit'});
+    return {label:name, full:`${name} (${b.n} de ${dim} dias)`, v:b.v, partial:b.n<dim};
+  });
+}
+
+/* ---------- gráfico de barras (série única, tooltip por barra) ---------- */
+function barChart(series, period, title){
+  const data = buckets(series, period);
+  const W = 360, H = 170, L = 38, R = 6, TOP = 8, B = 20;
+  const max = Math.max(1, ...data.map(d => d.v));
+  const nice = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); for (const m of [1,2,2.5,5,10]) if (m*p >= max) return m*p; return max; })();
+  const n = Math.max(data.length, period==='day' ? 7 : 4), slot = (W-L-R)/n, bw = Math.min(26, slot-2);
+  const y = v => TOP + (H-TOP-B) * (1 - v/nice);
+  let g = '';
+  for (let i = 0; i <= 2; i++){ const v = nice*i/2, yy = y(v); g += `<line class="grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text class="axis" x="${L-5}" y="${yy+3}" text-anchor="end">${fmtN(v).replace(' ','')}</text>`; }
+  const every = Math.ceil(data.length / 6);
+  const bars = data.map((d,i) => {
+    const x = L + slot*i + (slot-bw)/2, yy = y(d.v), h = Math.max(0, H-B-yy), r = Math.min(4, bw/2, h);
+    const path = `M${x},${H-B}V${yy+r}Q${x},${yy} ${x+r},${yy}H${x+bw-r}Q${x+bw},${yy} ${x+bw},${yy+r}V${H-B}Z`;
+    const lbl = (i % every === 0 || i === data.length-1) ? `<text class="axis" x="${x+bw/2}" y="${H-6}" text-anchor="middle">${d.label}</text>` : '';
+    return `<rect class="hit" data-i="${i}" x="${L+slot*i}" y="${TOP}" width="${slot}" height="${H-TOP-B}" fill="transparent"/><path class="bar ${d.partial?'partial':''}" d="${path}"/>${lbl}`;
+  }).join('');
+  const id = 'c' + Math.random().toString(36).slice(2,7);
+  const note = data.length <= 1 ? `<p class="note" style="margin:4px 4px 6px">O gráfico ganha uma barra a cada dia coletado. Barras claras = período ainda incompleto.</p>` : (data.some(d=>d.partial) ? `<p class="note" style="margin:4px 4px 6px">Barras claras = período ainda incompleto.</p>` : '');
+  setTimeout(() => {
+    const root = document.getElementById(id); if (!root) return;
+    const tip = root.querySelector('.tip'), svg = root.querySelector('svg');
+    const show = el => { const d = data[+el.dataset.i]; const r = svg.getBoundingClientRect(), rr = root.getBoundingClientRect(), br = el.getBoundingClientRect();
+      root.querySelectorAll('.bar').forEach((b,j) => b.classList.toggle('hl', j === +el.dataset.i));
+      tip.innerHTML = `<b>${nf.format(d.v)}</b>${d.full}`; tip.style.display = 'block';
+      tip.style.left = Math.min(rr.width-70, Math.max(70, br.left - rr.left + br.width/2)) + 'px'; tip.style.top = (y(d.v)/H*r.height + r.top - rr.top - 6) + 'px'; };
+    const hide = () => { tip.style.display = 'none'; root.querySelectorAll('.bar.hl').forEach(b => b.classList.remove('hl')); };
+    root.querySelectorAll('.hit').forEach(h => { h.onmouseenter = () => show(h); h.onclick = () => show(h); });
+    svg.onmouseleave = hide;
+    root.querySelector('[data-tbl]').onclick = e => { const t = root.querySelector('.tbl'); t.hidden = !t.hidden; e.target.textContent = t.hidden ? 'Ver tabela' : 'Ver gráfico'; svg.style.display = t.hidden ? '' : 'none'; };
+  });
+  return `<div class="chart" id="${id}"><h3>${esc(title)}<button data-tbl>Ver tabela</button></h3>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${g}${bars}</svg><div class="tip"></div>
+    <table class="tbl" hidden>${data.slice().reverse().map(d => `<tr><td>${esc(d.full)}</td><td>${nf.format(d.v)}</td></tr>`).join('')}</table>${note}</div>`;
+}
+
+function kpis(st, clickable){
+  return `<div class="kpis">
+    <div class="kpi"><span>Total acumulado</span><b>${fmtN(st.total)}</b><span>${nf.format(st.total)}</span></div>
+    ${Object.entries(P).map(([k,v]) => `<button class="kpi ${S.period===k?'on':''}" data-p="${k}"><span>${v.short}</span><b>${fmtN(st[k].value)}</b>${chg(st[k].change)} ${coverage(st[k])}</button>`).join('')}
+  </div>`;
+}
+
+/* ---------- lista de álbuns/músicas ---------- */
+function itemList(items, kind, artistId, limit){
+  const p = S.period;
+  const sorted = items.slice().sort((a,b) => b.stats[p].value - a.stats[p].value);
+  return sorted.slice(0, limit).map((it,i) => `
+    <button class="irow" data-go="${it.id}">
+      <span class="num">${i+1}</span>
+      <img src="${pic(it.img)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
+      <div class="t"><b>${it.flag==='*'?'<span class="note">feat. · </span>':''}${esc(it.name)}</b><i>Total ${fmtN(it.stats.total)}</i></div>
+      <div class="v"><b>${fmtN(it.stats[p].value)}</b>${chg(it.stats[p].change) || `<i>${P[p].short.toLowerCase()}</i>`}</div>
+    </button>`).join('');
+}
+
+Object.assign(Screens, {
+  async streams(_, alive){
+    view.innerHTML = `
+      <div class="top"><div class="avatar">S</div><h1>Streams</h1>
+        <button class="btn ghost" id="addBtn" style="margin-left:auto">+ Artista</button></div>
+      <div class="addbox" id="addbox" hidden>
+        <input id="aq" placeholder="Nome do artista ou link do Spotify" autocomplete="off">
+        <div id="ares"></div>
+      </div>
+      ${periodSeg()}
+      <div id="alist">${phRows(3)}</div>
+      <p class="note" id="foot" style="margin-top:14px;line-height:1.6"></p>`;
+    bindSeg(render);
+    $('#addBtn').onclick = () => { const b = $('#addbox'); b.hidden = !b.hidden; if (!b.hidden) $('#aq').focus(); };
+    let t;
+    $('#aq').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
+      const q = $('#aq').value.trim(), box = $('#ares');
+      const link = q.match(/artist\/([A-Za-z0-9]{22})/) || q.match(/^([A-Za-z0-9]{22})$/);
+      const results = link ? [{id:link[1], name:'Artista do link'}] : (q.length < 2 ? [] : await searchIndex(q));
+      box.innerHTML = results.map((r,i) => `<div class="irow"><div class="avatar" style="width:40px;height:40px">${esc(r.name[0]||'?')}</div><div class="t"><b>${esc(r.name)}</b><i>${r.totalM ? fmtN(r.totalM*1e6)+' streams no total' : 'via link do Spotify'}</i></div><button class="btn" data-add="${i}">Acompanhar</button></div>`).join('')
+        || (q.length >= 2 ? '<p class="note" style="padding:10px 0">Nenhum artista encontrado. A busca cobre os ~3.000 maiores do Spotify. Para outros, cole o link do artista no Spotify.</p>' : '');
+      box.onclick = e => { const b = e.target.closest('[data-add]'); if (!b) return; const r = results[+b.dataset.add]; issueLink('Acompanhar', r.id, r.name); };
+    }, 300); };
+
+    try {
+      const sum = await dataJSON('summary.json');
+      REPO = sum.repo;
+      const artists = sum.artists, nextCheck = nextRun();
+      if (!alive()) return;
+      const p = S.period;
+      $('#alist').innerHTML = artists.length ? artists.map((a,i) => a.pending ? '' : `
+        <button class="acard" data-i="${i}">
+          <img src="${pic(a.img)}" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
+          <div class="t"><b>${esc(a.name)}</b>
+            <div class="bignum">${fmtN(a.stats[p].value)} ${chg(a.stats[p].change)}</div>
+            <div class="note">${P[p].short} · total ${fmtN(a.stats.total)}${a.stats[p].complete ? '' : ` · parcial (${a.stats[p].covered}/${a.stats[p].days} dias)`}</div>
+            ${a.error ? `<div class="note" style="color:var(--bad)">⚠ Última coleta falhou</div>` : ''}
+          </div>
+          ${spark(a.spark)}
+        </button>`).join('')
+        : `<div class="empty">Nenhum artista acompanhado ainda.<br><br><button class="btn" onclick="document.getElementById('addBtn').click()">+ Adicionar artista</button></div>`;
+      $('#alist').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'streamArtist', id:artists[+b.dataset.i].id}); };
+      const last = artists.map(a => a.lastDate).filter(Boolean).sort().pop();
+      $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
+        ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a>` : ''}`;
+    } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
+  },
+
+  async streamArtist({id}, alive){
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button>${phRows(6)}`;
+    let d;
+    try { d = await dataJSON(`artists/${id}.json`); d.series = toSeries(d.series); if (!REPO) REPO = (await dataJSON('summary.json').catch(()=>({}))).repo; } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Sem dados para este artista.</p>`; return; }
+    if (!alive()) return;
+    let tab = 'albums', limit = 30, q = '';
+    const paint = () => {
+      const p = S.period, st = d.stats, br = d.breakdown;
+      const tot = br.lead.t + br.feat.t || 1;
+      view.innerHTML = `
+        <div class="hero-artist" style="background-image:url('${pic(d.img)}')">
+          <button class="back" onclick="back()">${I.back}</button>
+          <h1>${esc(d.name)}</h1>
+          <div class="note" style="color:#ddd">${d.tracks} faixas · dados até ${fmtDateLong(d.lastDate)} · ${d.days} ${d.days===1?'dia coletado':'dias coletados'}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <a class="pill" href="https://chartmasters.org/spotify-streaming-numbers-tool/?artist_name=&artist_id=${id}" target="_blank" rel="noopener">Ver no Chartmasters</a>
+            <a class="pill" href="https://kworb.net/spotify/artist/${id}_songs.html" target="_blank" rel="noopener">Ver no kworb</a>
+            <button class="pill" id="unf">Deixar de acompanhar</button>
+          </div>
+        </div>
+        ${periodSeg()}
+        ${kpis(st)}
+        ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
+        <div class="chart"><h3>De onde vêm os streams (total)</h3>
+          <div class="split"><span style="width:${br.lead.t/tot*100}%;background:var(--viz)"></span><span style="width:${br.feat.t/tot*100}%;background:#8a63d2"></span></div>
+          <div class="legend"><span><i style="background:var(--viz)"></i>Como principal ${fmtN(br.lead.t)}</span><span><i style="background:#8a63d2"></i>Participações ${fmtN(br.feat.t)}</span><span>(${fmtN(br.solo.t)} solo, sem feats)</span></div>
+        </div>
+        <div class="tabs"><button data-t="albums" class="${tab==='albums'?'on':''}">Álbuns (${d.albums.length})</button><button data-t="songs" class="${tab==='songs'?'on':''}">Músicas (${d.songs.length})</button></div>
+        <input class="filter" id="flt" placeholder="Filtrar ${tab==='albums'?'álbuns':'músicas'}…" value="${esc(q)}">
+        <p class="note">Ordenado por streams ${P[p].label.toLowerCase()}s</p>
+        <div id="items"></div>`;
+      const list = () => {
+        const src = d[tab].filter(x => !q || x.name.toLowerCase().includes(q.toLowerCase()));
+        $('#items').innerHTML = itemList(src, tab, id, limit) + (src.length > limit ? `<button class="btn ghost" id="more" style="margin:14px auto;display:block">Mostrar mais</button>` : '');
+        if ($('#more')) $('#more').onclick = () => { limit += 50; list(); };
+      };
+      list();
+      bindSeg(paint);
+      view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
+      view.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; limit = 30; q = ''; paint(); });
+      $('#flt').oninput = e => { q = e.target.value; list(); };
+      $('#items').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go({type:'streamItem', artistId:id, kind:tab, id:b.dataset.go}); };
+      $('#unf').onclick = () => issueLink('Remover', id, d.name);
+    };
+    paint();
+  },
+
+  async streamItem({artistId, kind, id}, alive){
+    view.innerHTML = `<button class="back" onclick="back()">${I.back}</button>${phRows(4)}`;
+    let d;
+    try { d = await dataJSON(`artists/${artistId}/${kind}_${id}.json`); d.series = toSeries(d.series); } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Sem dados.</p>`; return; }
+    if (!alive()) return;
+    const isAlbum = kind === 'albums';
+    const paint = () => {
+      const p = S.period;
+      view.innerHTML = `
+        <button class="back" onclick="back()">${I.back}</button>
+        <img class="hero" src="${pic(d.img)}" alt="">
+        <h1>${esc(d.name)}</h1>
+        <div class="sub" style="color:var(--text);font-weight:700;margin-top:6px">${esc(d.artistName)}</div>
+        <div class="sub">${isAlbum?'Álbum':'Música'} · ${d.days} ${d.days===1?'dia coletado':'dias coletados'}</div>
+        <div class="actions"><a class="pill" href="https://open.spotify.com/${isAlbum?'album':'track'}/${id}" target="_blank" rel="noopener">Abrir no Spotify</a><button class="pill" id="prev">Ouvir prévia aqui</button></div>
+        ${periodSeg()}
+        ${kpis(d.stats)}
+        ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}`;
+      bindSeg(paint);
+      view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
+      $('#prev').onclick = async () => {
+        const name = d.name.replace(/\s*[\(\[].*?[\)\]]/g, '');
+        const res = await API.itunes(isAlbum ? {term:`${d.artistName} ${name}`, entity:'album', limit:5} : {term:`${d.artistName} ${name}`, media:'music', entity:'song', limit:5}).catch(()=>[]);
+        if (!res.length) return toast('Prévia não encontrada');
+        if (isAlbum) go({type:'album', id:res[0].collectionId});
+        else { const s = res.filter(r => r.previewUrl).map(songItem); s.length ? playQueue(s, 0, d.artistName) : toast('Prévia não encontrada'); }
+      };
+    };
+    paint();
+  },
+});
+
+function spark(pts){
+  if (!pts || pts.length < 2) return '';
+  const W = 70, H = 30, max = Math.max(...pts), min = Math.min(...pts), rng = max-min || 1;
+  const d = pts.map((v,i) => `${i?'L':'M'}${(i/(pts.length-1)*W).toFixed(1)},${(H-2-(v-min)/rng*(H-4)).toFixed(1)}`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:70px;height:30px;flex:none" aria-hidden="true"><path d="${d}" fill="none" stroke="var(--viz-hi)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+render();
+</script>
+</body>
+</html>
