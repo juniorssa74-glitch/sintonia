@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d0f0e">
 <title>Sintonia</title>
+<script>
+  // Dentro do APK (Capacitor), carrega a ponte JS para usar compartilhar, arquivos e músicas do celular.
+  if (window.Capacitor) document.write('<script src="https://cdn.jsdelivr.net/npm/@capacitor/core@7.6.9/dist/capacitor.js"><\/script>');
+</script>
 <meta name="description" content="Streams diários, semanais e mensais de artistas e álbuns no Spotify">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -191,6 +195,23 @@ a.pill{color:var(--text);text-decoration:none}
 .split{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin:8px 0 6px}
 .split span{display:block;height:100%}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.trow{display:grid;grid-template-columns:28px 1fr 74px 74px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.trow:disabled{cursor:default;opacity:.6}
+.trow .num{color:var(--muted);font-weight:700;font-size:12px;text-align:center}
+.trow .t{min-width:0}
+.trow .t b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow i{display:block;font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
+.trow .c{text-align:right;font-variant-numeric:tabular-nums}
+.trow .c b{display:block;font-size:13px}
+.trow.thead{font-size:11px;color:var(--muted);font-weight:700;padding:4px 0}
+.trow.tfoot{border-bottom:0;font-size:12px;color:var(--muted)}
+.preview{background:var(--card);border-radius:12px;padding:12px;display:flex;justify-content:center}
+.preview canvas{max-width:100%;max-height:58vh;width:auto;height:auto;border-radius:6px;box-shadow:0 8px 24px #0008}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opts button{background:var(--card);border:1px solid transparent;border-radius:10px;padding:10px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.opts button.on{border-color:var(--accent)}
+.opts b{font-size:13px} .opts i{font-style:normal;font-size:11px;color:var(--muted)}
+.opts .sw{width:100%;height:26px;border-radius:6px;border-bottom:4px solid;margin-bottom:4px}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
 .nav button.on{color:var(--text)}
 
@@ -584,11 +605,14 @@ const Screens = {
       <div class="top"><div class="avatar">S</div><h1>Sua Biblioteca</h1></div>
       <button class="row" id="likedRow"><div style="width:48px;height:48px;border-radius:6px;background:linear-gradient(135deg,#4c2fd6,#9ad8c3);display:grid;place-items:center;flex:none">${I.heartOn}</div>
         <div class="t"><b>Curtidas</b><i>Playlist · ${liked.length} ${liked.length===1?'item':'itens'}</i></div></button>
+      <button class="row" id="localRow"><div style="width:48px;height:48px;border-radius:6px;background:linear-gradient(135deg,#1d8a42,#0d3b1e);display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg></div>
+        <div class="t"><b>Músicas do celular</b><i>Arquivos de áudio do aparelho · sem áudios do WhatsApp</i></div></button>
       <h2>Podcasts que você segue</h2>
       <div id="follows">${S.follows.length ? S.follows.map((p,i) => `<button class="row" data-i="${i}">${img(p.art)}<div class="t"><b>${esc(p.title)}</b><i>Podcast · ${esc(p.sub)}</i></div></button>`).join('') : '<p class="empty">Siga um podcast para ver novos episódios aqui.</p>'}</div>
       <h2>Tocados recentemente</h2>
       <div id="recs">${S.recents.length ? S.recents.map((r,i) => `<button class="row" data-r="${i}">${img(r.art)}<div class="t"><b>${esc(r.title)}</b><i>${{radio:'Rádio ao vivo',album:'Álbum',podcast:'Podcast'}[r.type]||''}</i></div></button>`).join('') : '<p class="empty">Nada por aqui ainda.</p>'}</div>`;
     $('#likedRow').onclick = () => go({type:'liked'});
+    $('#localRow').onclick = () => go({type:'local'});
     $('#follows').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:S.follows[+b.dataset.i].id}); };
     $('#recs').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
       if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
@@ -950,6 +974,7 @@ Object.assign(Screens, {
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
             <a class="pill" href="https://chartmasters.org/spotify-streaming-numbers-tool/?artist_name=&artist_id=${id}" target="_blank" rel="noopener">Ver no Chartmasters</a>
             <a class="pill" href="https://kworb.net/spotify/artist/${id}_songs.html" target="_blank" rel="noopener">Ver no kworb</a>
+            <button class="pill on" id="mkimg">Criar imagem</button>
             <button class="pill" id="unf">Deixar de acompanhar</button>
           </div>
         </div>
@@ -976,6 +1001,7 @@ Object.assign(Screens, {
       $('#flt').oninput = e => { q = e.target.value; list(); };
       $('#items').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go({type:'streamItem', artistId:id, kind:tab, id:b.dataset.go}); };
       $('#unf').onclick = () => issueLink('Remover', id, d.name);
+      $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, 'artist')});
     };
     paint();
   },
@@ -994,11 +1020,14 @@ Object.assign(Screens, {
         <h1>${esc(d.name)}</h1>
         <div class="sub" style="color:var(--text);font-weight:700;margin-top:6px">${esc(d.artistName)}</div>
         <div class="sub">${isAlbum?'Álbum':'Música'} · ${d.days} ${d.days===1?'dia coletado':'dias coletados'}</div>
-        <div class="actions"><a class="pill" href="https://open.spotify.com/${isAlbum?'album':'track'}/${id}" target="_blank" rel="noopener">Abrir no Spotify</a><button class="pill" id="prev">Ouvir prévia aqui</button></div>
+        <div class="actions" style="flex-wrap:wrap"><a class="pill" href="https://open.spotify.com/${isAlbum?'album':'track'}/${id}" target="_blank" rel="noopener">Abrir no Spotify</a><button class="pill" id="prev">Ouvir prévia aqui</button><button class="pill on" id="mkimg">Criar imagem</button></div>
         ${periodSeg()}
         ${kpis(d.stats)}
-        ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}`;
+        ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
+        ${isAlbum ? tracksBlock(d) : ''}`;
       bindSeg(paint);
+      $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
+      if ($('#tracks')) $('#tracks').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({type:'streamItem', artistId, kind:'songs', id:b.dataset.song}); };
       view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
       $('#prev').onclick = async () => {
         const name = d.name.replace(/\s*[\(\[].*?[\)\]]/g, '');
@@ -1011,6 +1040,234 @@ Object.assign(Screens, {
     paint();
   },
 });
+
+/* ---------- faixas do álbum ---------- */
+function tracksBlock(d){
+  if (!d.tracks) return `<h2>Faixas</h2><p class="note">Lista de faixas não encontrada para este álbum.</p>`;
+  const multi = new Set(d.tracks.map(t => t.disc)).size > 1;
+  const withData = d.tracks.filter(t => t.stats);
+  const sumT = withData.reduce((a,t) => a + t.stats.total, 0), sumD = withData.reduce((a,t) => a + t.stats.day.value, 0);
+  return `<h2>Faixas <small>${d.tracks.length} faixas</small></h2>
+    <div class="trow thead"><span class="num">#</span><span class="t">Música</span><span class="c">Total</span><span class="c">Diário</span></div>
+    <div id="tracks">${d.tracks.map(t => `
+      <button class="trow" ${t.id ? `data-song="${t.id}"` : 'disabled'}>
+        <span class="num">${multi ? t.disc + '.' : ''}${t.no}</span>
+        <span class="t"><b>${esc(t.name)}</b>${t.stats ? '' : '<i>sem dados no kworb</i>'}</span>
+        <span class="c">${t.stats ? `<b>${fmtN(t.stats.total)}</b><i>${nf.format(t.stats.total)}</i>` : '—'}</span>
+        <span class="c">${t.stats ? `<b>${fmtN(t.stats.day.value)}</b>${chg(t.stats.day.change) || `<i>${nf.format(t.stats.day.value)}</i>`}` : '—'}</span>
+      </button>`).join('')}</div>
+    <div class="trow tfoot"><span class="num"></span><span class="t">Soma das faixas com dados (${withData.length})</span><span class="c"><b>${fmtN(sumT)}</b></span><span class="c"><b>${fmtN(sumD)}</b></span></div>
+    <p class="note" style="margin-top:6px">Faixas da Apple Music cruzadas pelo nome com os streams do Spotify (kworb). Em álbuns de outros artistas, só as faixas com ${esc(d.artistName)} têm dados.</p>`;
+}
+
+/* =================== GERADOR DE IMAGENS PARA REDES SOCIAIS =================== */
+const SIZES = {
+  story:  {label:'Stories', sub:'1080×1920', w:1080, h:1920},
+  feed:   {label:'Feed 4:5', sub:'1080×1350', w:1080, h:1350},
+  square: {label:'Quadrado', sub:'1080×1080', w:1080, h:1080},
+  wide:   {label:'Paisagem', sub:'1600×900 · X', w:1600, h:900},
+};
+const STYLES = {
+  escuro: {label:'Escuro', bg:'#0d0f0e', text:'#f2f5f3', muted:'#9aa49f', accent:'#3ddc6f', card:'#1d211f'},
+  capa:   {label:'Capa desfocada', bg:'#000', text:'#ffffff', muted:'#d7ddd9', accent:'#3ddc6f', card:'rgba(0,0,0,.35)', blur:true},
+  claro:  {label:'Claro', bg:'#f4f1ea', text:'#141614', muted:'#5f665f', accent:'#1d8a42', card:'#e8e3d8'},
+  neon:   {label:'Neon', bg:'#12061f', text:'#ffffff', muted:'#c9b8e6', accent:'#ff3dbb', card:'rgba(255,255,255,.08)', grad:['#2a0b4d','#05141c']},
+};
+const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música'};
+
+function shareSource(d, kind){
+  const top = kind === 'artist' ? d.songs.map(s => ({name:s.name, stats:s.stats}))
+            : kind === 'album' && d.tracks ? d.tracks.filter(t => t.stats).map(t => ({name:t.name, stats:t.stats})) : [];
+  return { kind, title: d.name, artist: kind === 'artist' ? '' : d.artistName, img: d.img, stats: d.stats, lastDate: d.lastDate || d.series?.[d.series.length-1]?.date, top };
+}
+
+function loadImg(u){
+  return new Promise(ok => { if (!u) return ok(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = viaProxy(u); });
+}
+function rr(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+function coverDraw(ctx, im, x, y, w, h){ const s = Math.max(w/im.width, h/im.height), iw = im.width*s, ih = im.height*s; ctx.drawImage(im, x+(w-iw)/2, y+(h-ih)/2, iw, ih); }
+function fitFont(ctx, text, weight, size, maxW, min=20){ let s = size; do { ctx.font = `${weight} ${s}px "Plus Jakarta Sans", sans-serif`; if (ctx.measureText(text).width <= maxW) break; s -= 2; } while (s > min); return s; }
+function clip(ctx, text, maxW){ if (ctx.measureText(text).width <= maxW) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; }
+
+async function drawShare(canvas, src, o){
+  const Z = SIZES[o.size], st = STYLES[o.style], W = Z.w, H = Z.h, u = W/1080;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  await document.fonts.load('800 60px "Plus Jakarta Sans"').catch(()=>{});
+  const im = await loadImg(src.img);
+  // fundo
+  if (st.grad){ const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, st.grad[0]); g.addColorStop(1, st.grad[1]); ctx.fillStyle = g; } else ctx.fillStyle = st.bg;
+  ctx.fillRect(0, 0, W, H);
+  if (st.blur && im){ ctx.save(); ctx.filter = `blur(${Math.round(40*u)}px) brightness(.55)`; coverDraw(ctx, im, -60*u, -60*u, W+120*u, H+120*u); ctx.restore(); }
+  if (o.style === 'escuro'){ const g = ctx.createRadialGradient(W*.5, 0, 0, W*.5, 0, H*.8); g.addColorStop(0, 'rgba(61,220,111,.22)'); g.addColorStop(1, 'rgba(61,220,111,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+
+  const P = o.period, stt = src.stats[P], vertical = H/W >= 0.95; // só o formato paisagem fica lado a lado
+  const label = {day:'streams no dia', week:'streams em 7 dias', month:'streams em 30 dias'}[P];
+  const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'}) : '';
+  const M = 72*u; // margem
+  ctx.textBaseline = 'alphabetic';
+
+  // capa
+  let cx, cy, cs, tx, ty, tw;
+  if (vertical){ cs = Math.min(W - 2*M - 140*u, H*(H/W > 1.5 ? 0.36 : H/W > 1.1 ? 0.33 : 0.3)); cx = (W-cs)/2; cy = M + 70*u; tx = M; tw = W - 2*M; ty = cy + cs + 90*u; }
+  else { cs = Math.min(H - 2*M - 80*u, W*0.4); cx = M; cy = (H-cs)/2 - 20*u; tx = cx + cs + 64*u; tw = W - tx - M; ty = cy + 40*u; }
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
+  rr(ctx, cx, cy, cs, cs, src.kind === 'artist' ? cs/2 : 18*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
+  if (im){ ctx.save(); rr(ctx, cx, cy, cs, cs, src.kind === 'artist' ? cs/2 : 18*u); ctx.clip(); coverDraw(ctx, im, cx, cy, cs, cs); ctx.restore(); }
+
+  const align = vertical ? 'center' : 'left', ax = vertical ? W/2 : tx;
+  ctx.textAlign = align;
+  // tipo
+  ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText((KIND_LABEL[src.kind] + ' · Spotify').toUpperCase(), ax, ty); ty += 70*u;
+  // título
+  ctx.fillStyle = st.text; fitFont(ctx, src.title, 800, 76*u, tw, 34*u); ctx.fillText(clip(ctx, src.title, tw), ax, ty); ty += 52*u;
+  if (src.artist){ ctx.fillStyle = st.muted; fitFont(ctx, src.artist, 600, 38*u, tw, 24*u); ctx.fillText(clip(ctx, src.artist, tw), ax, ty); ty += 30*u; }
+  ty += 80*u;
+  // número principal
+  const big = nf.format(stt.value);
+  ctx.fillStyle = st.accent; fitFont(ctx, big, 800, (vertical ? 128 : 112)*u, tw, 48*u); ctx.fillText(big, ax, ty); ty += 50*u;
+  ctx.fillStyle = st.text; ctx.font = `700 ${34*u}px "Plus Jakarta Sans", sans-serif`;
+  let line2 = label;
+  if (stt.change != null) line2 += `  ${stt.change >= 0 ? '▲' : '▼'} ${Math.abs(stt.change*100).toLocaleString('pt-BR', {maximumFractionDigits:1})}%`;
+  ctx.fillText(line2, ax, ty); ty += 46*u;
+  ctx.fillStyle = st.muted; ctx.font = `600 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText(`Total: ${nf.format(src.stats.total)} streams`, ax, ty); ty += 30*u;
+  if (!stt.complete) { ty += 12*u; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText(`período parcial · ${stt.covered} de ${stt.days} dias coletados`, ax, ty); ty += 20*u; }
+
+  // top faixas
+  const footerH = 90*u, room = H - ty - footerH - 50*u, rowH = 66*u;
+  const n = o.list ? Math.max(0, Math.min(5, Math.floor((room - 60*u) / rowH))) : 0;
+  const top = src.top.slice().sort((a,b) => b.stats[P].value - a.stats[P].value).slice(0, n);
+  if (top.length){
+    ty += 56*u;
+    const lx = vertical ? M : tx, lw = vertical ? W - 2*M : tw;
+    ctx.save(); rr(ctx, lx, ty, lw, 40*u + rowH*top.length + 26*u, 22*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
+    ty += 52*u; ctx.textAlign = 'left';
+    ctx.fillStyle = st.muted; ctx.font = `800 ${22*u}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(src.kind === 'artist' ? 'MÚSICAS EM ALTA' : 'FAIXAS EM ALTA', lx + 28*u, ty); ty += 14*u;
+    top.forEach((t, i) => {
+      ty += rowH;
+      ctx.textAlign = 'left'; ctx.fillStyle = st.accent; ctx.font = `800 ${30*u}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillText(String(i+1), lx + 28*u, ty - 18*u);
+      ctx.fillStyle = st.text; ctx.font = `700 ${30*u}px "Plus Jakarta Sans", sans-serif`;
+      const v = fmtN(t.stats[P].value); ctx.textAlign = 'right';
+      ctx.fillText(v, lx + lw - 28*u, ty - 18*u); const vw = ctx.measureText(v).width;
+      ctx.textAlign = 'left'; ctx.fillText(clip(ctx, t.name, lw - 120*u - vw), lx + 76*u, ty - 18*u);
+    });
+  }
+  // rodapé
+  const foot = `Dados de ${date} · fonte: kworb.net`;
+  if (vertical){
+    ctx.textAlign = 'center'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(clip(ctx, foot, W - 2*M), W/2, H - M + 20*u);
+    ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText('Sintonia', W/2, M + 20*u);
+  } else {
+    ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText('Sintonia', W - M, H - M + 20*u); const sw = ctx.measureText('Sintonia').width;
+    ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillText(clip(ctx, foot, W - M - sw - 40*u - tx), tx, H - M + 20*u);
+  }
+}
+
+async function exportShare(canvas, name){
+  const file = `sintonia-${name.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase().slice(0, 40)}.png`;
+  const FS = capPlugin('Filesystem'), SH = capPlugin('Share');
+  if (FS && SH){
+    const data = canvas.toDataURL('image/png').split(',')[1];
+    const w = await FS.writeFile({path: file, data, directory: 'CACHE'});
+    try { await SH.share({title: name, files: [w.uri], dialogTitle: 'Compartilhar imagem'}); }
+    catch (e) { if (!/cancel/i.test(e.message || '')) throw e; }
+    return;
+  }
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  const f = new File([blob], file, {type:'image/png'});
+  if (navigator.canShare?.({files:[f]})) { try { await navigator.share({files:[f], title:name}); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Imagem salva em Downloads');
+}
+
+Screens.share = function({src}){
+  const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'escuro'), period: S.period, list: true };
+  view.innerHTML = `
+    <button class="back" onclick="back()">${I.back}</button>
+    <h1>Criar imagem</h1>
+    <div class="sub" style="margin-bottom:12px">${esc(KIND_LABEL[src.kind])} · ${esc(src.title)}</div>
+    <div class="preview"><canvas id="cv"></canvas></div>
+    <h2 style="margin-top:18px">Dimensão</h2>
+    <div class="opts" id="osize">${Object.entries(SIZES).map(([k,v]) => `<button data-v="${k}" class="${o.size===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>
+    <h2>Estilo</h2>
+    <div class="opts" id="ostyle">${Object.entries(STYLES).map(([k,v]) => `<button data-v="${k}" class="${o.style===k?'on':''}"><span class="sw" style="background:${v.grad ? `linear-gradient(135deg,${v.grad[0]},${v.grad[1]})` : v.bg};border-color:${v.accent}"></span><b>${v.label}</b></button>`).join('')}</div>
+    <h2>Período</h2>
+    <div class="seg" id="operiod">${Object.entries(P).map(([k,v]) => `<button data-v="${k}" class="${o.period===k?'on':''}">${v.label}</button>`).join('')}</div>
+    ${src.top.length ? `<label class="note" style="display:flex;gap:8px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="olist" checked> Mostrar ${src.kind==='artist'?'músicas':'faixas'} em alta</label>` : ''}
+    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px">Compartilhar / salvar imagem</button>`;
+  const cv = $('#cv');
+  let busy = Promise.resolve();
+  const redraw = () => { busy = busy.then(() => drawShare(cv, src, o)).then(() => { cv.style.aspectRatio = `${cv.width}/${cv.height}`; }); };
+  const bind = (sel, key, persist) => $(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; o[key] = b.dataset.v; if (persist) store.set(persist, o[key]);
+    $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); redraw(); };
+  bind('#osize', 'size', 'shareSize'); bind('#ostyle', 'style', 'shareStyle'); bind('#operiod', 'period');
+  if ($('#olist')) $('#olist').onchange = e => { o.list = e.target.checked; redraw(); };
+  $('#sbtn').onclick = async () => { await busy; try { await exportShare(cv, src.title); } catch (e) { toast('Não foi possível compartilhar'); console.error(e); } };
+  redraw();
+};
+
+/* =================== MÚSICAS DO CELULAR =================== */
+// No APK: plugin nativo "LocalAudio" lista os áudios do aparelho (MediaStore), já sem WhatsApp.
+// No navegador: o usuário escolhe os arquivos; nomes típicos do WhatsApp são descartados.
+const LOCAL_ART = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#1d3b29"/><path d="M40 28v34.5a10 10 0 1 0 6 9.2V40l22-5v20.5a10 10 0 1 0 6 9.2V22z" fill="#3ddc6f"/></svg>');
+function capPlugin(name){
+  const C = window.Capacitor;
+  if (!C?.isNativePlatform?.()) return null;
+  capPlugin.cache ??= {};
+  return capPlugin.cache[name] ??= (C.registerPlugin ? C.registerPlugin(name) : C.Plugins?.[name] || null);
+}
+const isWhatsApp = s => /whatsapp|com\.whatsapp|^(ptt|aud)-\d{8}-wa\d+/i.test(s);
+S.localTracks = null;
+function localItem(t){ return { kind:'local', id:'l'+t.id, title:t.title, sub:[t.artist, t.album].filter(Boolean).join(' · ') || 'No celular', art:LOCAL_ART, url:t.url, dur:t.duration/1000 }; }
+
+Screens.local = async function(_, alive){
+  const native = capPlugin('LocalAudio');
+  const paint = () => {
+    const list = S.localTracks || [];
+    view.innerHTML = `
+      <button class="back" onclick="back()">${I.back}</button>
+      <h1>Músicas do celular</h1>
+      <div class="sub" style="margin:4px 0 12px">${S.localTracks ? `${list.length} arquivos · áudios do WhatsApp ficam de fora` : 'Toque abaixo para ler os áudios do aparelho'}</div>
+      <div class="actions">
+        ${native ? `<button class="btn" id="scan">${S.localTracks ? 'Atualizar lista' : 'Ler músicas do celular'}</button>`
+                 : `<label class="btn" style="cursor:pointer">Escolher arquivos<input type="file" id="pick" accept="audio/*" multiple hidden></label>`}
+        ${list.length ? `<button class="bigplay" id="pa">${I.play}</button>` : ''}
+      </div>
+      ${list.length > 8 ? `<input class="filter" id="lf" placeholder="Filtrar por nome, artista ou álbum…">` : ''}
+      <div id="ll">${list.length ? '' : `<p class="empty">${native ? 'O app vai pedir permissão para acessar músicas e áudios.' : 'No navegador, escolha os arquivos de áudio. No app (APK), a lista é lida automaticamente.'}</p>`}</div>`;
+    const items = list.map(localItem);
+    const rows = q => {
+      const f = items.map((s,i) => [s,i]).filter(([s]) => !q || (s.title+' '+s.sub).toLowerCase().includes(q.toLowerCase())).slice(0, 400);
+      $('#ll').innerHTML = f.map(([s,i]) => `<div class="row" data-play="${i}"><img src="${s.art}" alt=""><div class="t"><b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${esc(s.title)}</b><i>${esc(s.sub)} · ${fmt(s.dur)}</i></div></div>`).join('');
+    };
+    if (list.length) { rows(''); $('#ll').onclick = e => { const b = e.target.closest('[data-play]'); if (b) playQueue(items, +b.dataset.play, 'Músicas do celular'); }; $('#pa').onclick = () => playQueue(items, 0, 'Músicas do celular'); }
+    if ($('#lf')) $('#lf').oninput = e => rows(e.target.value);
+    if ($('#scan')) $('#scan').onclick = async () => {
+      $('#scan').textContent = 'Lendo…';
+      try {
+        const r = await native.list();
+        S.localTracks = r.items.filter(t => !isWhatsApp(t.path || '') && !isWhatsApp(t.name || ''))
+          .map(t => ({ ...t, url: window.Capacitor.convertFileSrc(t.path) }));
+        if (alive()) paint();
+      } catch (e) { toast(/perm/i.test(e.message) ? 'Permissão negada nas configurações do Android' : 'Não foi possível ler as músicas'); if (alive()) paint(); }
+    };
+    if ($('#pick')) $('#pick').onchange = e => {
+      const files = [...e.target.files].filter(f => !isWhatsApp(f.name));
+      (S.localTracks || []).forEach(t => t.blob && URL.revokeObjectURL(t.url));
+      S.localTracks = files.map((f, i) => ({ id: 'f'+i+f.size, title: f.name.replace(/\.[^.]+$/, ''), artist:'', album:'', duration:0, url: URL.createObjectURL(f), blob:true }));
+      paint();
+    };
+  };
+  paint();
+  if (native && !S.localTracks) $('#scan').click();
+};
 
 function spark(pts){
   if (!pts || pts.length < 2) return '';

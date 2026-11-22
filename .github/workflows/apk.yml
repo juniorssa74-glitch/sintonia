@@ -41,6 +41,16 @@ jobs:
           (npm run icon && npx capacitor-assets generate --android) || echo "usando ícone padrão"
           npx cap sync android
 
+      - name: Plugin nativo (músicas do celular) e permissões
+        working-directory: android-shell/android
+        run: |
+          SRC=app/src/main/java/app/sintonia/streams
+          cp ../native/MainActivity.java ../native/LocalAudioPlugin.java "$SRC/"
+          M=app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>#' "$M"
+          grep -q READ_MEDIA_AUDIO "$M" || { echo "permissão não adicionada"; exit 1; }
+          cat "$M"
+
       - name: Compilar APK
         working-directory: android-shell/android
         run: ./gradlew assembleDebug --no-daemon
