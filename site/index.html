@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#F5F4EF; --bg2:#ECEAE2; --card:#FFFFFF; --card2:#ECEAE2; --line:#E6E4DC;
@@ -1214,6 +1214,7 @@ const SIZES = {
   wide:   {label:'Paisagem', sub:'1600×900 · X', w:1600, h:900},
 };
 const STYLES = {
+  auto:   {label:'Cores da capa', bg:'#2a1a12', text:'#ffffff', muted:'#e0d6cf', accent:'#ffb36b', card:'rgba(255,255,255,.08)', auto:true},
   escuro: {label:'Escuro', bg:'#0d0f0e', text:'#f2f5f3', muted:'#9aa49f', accent:'#3ddc6f', card:'#1d211f'},
   capa:   {label:'Capa desfocada', bg:'#000', text:'#ffffff', muted:'#d7ddd9', accent:'#3ddc6f', card:'rgba(0,0,0,.35)', blur:true},
   claro:  {label:'Claro', bg:'#f4f1ea', text:'#141614', muted:'#5f665f', accent:'#1d8a42', card:'#e8e3d8'},
@@ -1224,28 +1225,69 @@ const ARTS = {
   padrao:   {label:'Padrão', sub:'capa ou foto'},
   cd:       {label:'CD + disco', sub:'estojo e disco ao lado'},
   disco:    {label:'Disco', sub:'CD com a arte impressa'},
-  vinil:    {label:'Vinil', sub:'capa e LP saindo'},
+  vinil:    {label:'Vinil', sub:'capa e LP girando ao lado'},
   polaroid: {label:'Polaroid', sub:'foto instantânea'},
 };
-const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música'};
+const TEMPLATES = {
+  card:    {label:'Cartão', sub:'número em destaque'},
+  tabela:  {label:'Tabela de faixas', sub:'total, diário e variação'},
+  premios: {label:'Prêmios', sub:'resumo das conquistas'},
+};
+const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música', awards:'Prêmios'};
 const PERIOD_EN = {day:'Daily streams', week:'Weekly streams', month:'Monthly streams'};
 const MOTION_SECS = 8;
 
 function shareSource(d, kind){
   const top = kind === 'artist' ? d.songs.map(s => ({name:s.name, stats:s.stats}))
             : kind === 'album' && d.tracks ? d.tracks.filter(t => t.stats).map(t => ({name:t.name, stats:t.stats})) : [];
-  return { kind, title: d.name, artist: kind === 'artist' ? '' : d.artistName, img: d.img, stats: d.stats, lastDate: d.lastDate || d.series?.[d.series.length-1]?.date, top };
+  return { kind, title: d.name, artist: kind === 'artist' ? '' : d.artistName, img: d.img, stats: d.stats, lastDate: d.lastDate || d.series?.[d.series.length-1]?.date, top,
+           artistId: kind === 'artist' ? d.id : d.artistId, albumId: kind === 'album' ? d.id : null };
 }
 
 function loadImg(u){
   return new Promise(ok => { if (!u) return ok(null); const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = viaProxy(u); });
 }
 function rr(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
-function coverDraw(ctx, im, x, y, w, h){ const s = Math.max(w/im.width, h/im.height), iw = im.width*s, ih = im.height*s; ctx.drawImage(im, x+(w-iw)/2, y+(h-ih)/2, iw, ih); }
-function fitFont(ctx, text, weight, size, maxW, min=20){ let s = size; do { ctx.font = `${weight} ${s}px "Plus Jakarta Sans", sans-serif`; if (ctx.measureText(text).width <= maxW) break; s -= 2; } while (s > min); return s; }
+function coverDraw(ctx, im, x, y, w, h, fy = 0.5){ const s = Math.max(w/im.width, h/im.height), iw = im.width*s, ih = im.height*s; ctx.drawImage(im, x+(w-iw)/2, y+(h-ih)*fy, iw, ih); }
+function containDraw(ctx, im, x, y, w, h){ const s = Math.min(w/im.width, h/im.height), iw = im.width*s, ih = im.height*s; ctx.drawImage(im, x+(w-iw)/2, y+(h-ih)/2, iw, ih); }
+const FONT = '"Plus Jakarta Sans", sans-serif', SERIF = '"Cinzel", Georgia, serif';
+function fitFont(ctx, text, weight, size, maxW, min=20, fam=FONT){ let s = size; do { ctx.font = `${weight} ${s}px ${fam}`; if (ctx.measureText(text).width <= maxW) break; s -= 2; } while (s > min); return s; }
 function clip(ctx, text, maxW){ if (ctx.measureText(text).width <= maxW) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; }
 const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 const easeOut = p => 1 - Math.pow(1 - p, 3);
+const hsl = (h, s, l, a = 1) => `hsla(${Math.round(h*360)},${Math.round(clamp01(s)*100)}%,${Math.round(clamp01(l)*100)}%,${a})`;
+function seeded(str){ let h = 1779033703 ^ str.length; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 3432918353), h = h << 13 | h >>> 19;
+  return () => { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; }
+
+/* ---------- cor dominante da capa (para o estilo "Cores da capa" e o vinil) ---------- */
+function palette(im){
+  if (!im) return null;
+  const c = document.createElement('canvas'); c.width = c.height = 28;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0, 28, 28);
+  let px; try { px = g.getImageData(0, 0, 28, 28).data; } catch { return null; }
+  const bins = Array.from({length: 18}, () => ({w:0, r:0, g:0, b:0}));
+  let lum = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i]/255, gg = px[i+1]/255, b = px[i+2]/255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn)/2, d = mx - mn;
+    lum += l;
+    if (l < 0.1 || l > 0.93 || d < 0.08) continue;
+    const s = d / (1 - Math.abs(2*l - 1));
+    let h = mx === r ? ((gg - b)/d) % 6 : mx === gg ? (b - r)/d + 2 : (r - gg)/d + 4; h = (h/6 + 1) % 1;
+    const w = s*s*(1 - Math.abs(l - 0.5)), k = Math.floor(h*18) % 18;
+    bins[k].w += w; bins[k].r += r*w; bins[k].g += gg*w; bins[k].b += b*w;
+  }
+  const best = bins.reduce((a, b) => b.w > a.w ? b : a);
+  if (best.w < 0.4) return { h: 0.08, s: 0.12, l: 0.4, gray: true }; // capa quase sem cor
+  const r = best.r/best.w, gg = best.g/best.w, b = best.b/best.w, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn)/2, d = mx - mn;
+  let h = mx === r ? ((gg - b)/d) % 6 : mx === gg ? (b - r)/d + 2 : (r - gg)/d + 4; h = (h/6 + 1) % 1;
+  return { h, s: Math.min(0.85, Math.max(0.35, d / (1 - Math.abs(2*l - 1)))), l };
+}
+function autoStyle(p){
+  if (!p) return STYLES.escuro;
+  const s = p.gray ? 0.08 : p.s;
+  return { label:'Cores da capa', bg: hsl(p.h, s*0.7, 0.11), grad: [hsl(p.h, s*0.75, 0.24), hsl(p.h, s*0.6, 0.06)], text:'#ffffff',
+           muted: hsl(p.h, Math.min(s, 0.3), 0.8), accent: hsl(p.h, Math.max(s, 0.55), p.gray ? 0.85 : 0.66), card: 'rgba(255,255,255,.09)', auto: true };
+}
 
 /* ---------- mockups: estojo de CD, disco, vinil, polaroid ---------- */
 function imgSquare(ctx, im, x, y, s, fallback){ if (im) coverDraw(ctx, im, x, y, s, s); else { ctx.fillStyle = fallback; ctx.fillRect(x, y, s, s); } }
@@ -1256,19 +1298,15 @@ function drawCD(ctx, cx, cy, r, im, angle, full, u){
   ctx.restore();
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true); ctx.clip('evenodd');
-  // base prateada
   const g = ctx.createRadialGradient(cx, cy, r*0.1, cx, cy, r); g.addColorStop(0, '#eef1f4'); g.addColorStop(1, '#aeb4ba');
   ctx.fillStyle = g; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
-  // arte impressa (gira)
   const inner = full ? r*0.34 : r*0.36, outer = full ? r*0.985 : r*0.97;
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, outer, 0, 7); ctx.arc(cx, cy, inner, 0, 7, true); ctx.clip('evenodd');
   ctx.translate(cx, cy); ctx.rotate(angle); imgSquare(ctx, im, -outer, -outer, 2*outer, '#333'); ctx.restore();
-  // anel transparente do miolo
   ctx.beginPath(); ctx.arc(cx, cy, inner, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true);
   ctx.fillStyle = 'rgba(225,232,238,.55)'; ctx.fill('evenodd');
   ctx.beginPath(); ctx.arc(cx, cy, r*0.2, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2*u; ctx.stroke();
-  // brilho iridescente (fixo, a luz não gira)
   if (ctx.createConicGradient){
     const s = ctx.createConicGradient(-0.6, cx, cy);
     [[0,'rgba(255,255,255,0)'],[.08,'rgba(255,255,255,.32)'],[.13,'rgba(120,220,255,.18)'],[.2,'rgba(255,255,255,0)'],
@@ -1278,38 +1316,66 @@ function drawCD(ctx, cx, cy, r, im, angle, full, u){
   ctx.restore();
   ctx.beginPath(); ctx.arc(cx, cy, r - u, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2*u; ctx.stroke();
 }
-function drawVinyl(ctx, cx, cy, r, im, angle, u){
+// textura de vinil marmorizado na cor da capa (gerada uma vez por arte)
+function vinylTexture(R, size, key){
+  R.vtex ??= {};
+  if (R.vtex[size]) return R.vtex[size];
+  const p = R.pal || { h: 0, s: 0, l: 0.1, gray: true };
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), rnd = seeded(key || 'x'), S = size, h = p.h, s = p.gray ? 0.05 : Math.max(0.55, p.s);
+  const base = p.gray ? hsl(h, 0.02, 0.1) : hsl(h, s, 0.33);
+  g.fillStyle = base; g.fillRect(0, 0, S, S);
+  // anéis de luz e sombra (sulcos)
+  for (let k = 0; k < 18; k++) { g.beginPath(); g.arc(S/2, S/2, S*(0.18 + rnd()*0.32), 0, 7); g.lineWidth = S*(0.01 + rnd()*0.03); g.strokeStyle = rnd() < 0.5 ? hsl(h, s, 0.42, 0.25) : hsl(h, s, 0.18, 0.35); g.stroke(); }
+  // veios esfumaçados que acompanham o giro do disco (como vinil marmorizado)
+  const dark = i => p.gray ? `rgba(70,70,70,${0.18 + rnd()*0.25})` : hsl(h, s*0.9, 0.07, 0.18 + rnd()*0.3);
+  g.filter = `blur(${Math.max(2, S/160)}px)`;
+  for (let i = 0; i < 30; i++) {
+    const r0 = S*(0.2 + rnd()*0.28), a0 = rnd()*Math.PI*2, len = 0.6 + rnd()*2.2, dr = (rnd() - 0.5)*S*0.12;
+    g.beginPath();
+    for (let k = 0; k <= 24; k++) { const t = k/24, ang = a0 + t*len, rr2 = r0 + dr*t + Math.sin(t*9 + i)*S*0.012;
+      const x = S/2 + Math.cos(ang)*rr2, y = S/2 + Math.sin(ang)*rr2; k ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.strokeStyle = dark(i); g.lineWidth = S*(0.004 + rnd()*0.02); g.stroke();
+  }
+  // manchas claras
+  for (let i = 0; i < 10; i++) { const ang = rnd()*Math.PI*2, rr2 = S*(0.2 + rnd()*0.27), x = S/2 + Math.cos(ang)*rr2, y = S/2 + Math.sin(ang)*rr2, rad = S*(0.04 + rnd()*0.08);
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, p.gray ? 'rgba(255,255,255,.08)' : hsl(h, s, 0.5, 0.35)); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, 2*rad, 2*rad); }
+  g.filter = 'none';
+  return R.vtex[size] = c;
+}
+function drawVinyl(ctx, cx, cy, r, im, angle, u, R){
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
+  ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#0b0b0b'; ctx.fill();
   ctx.restore();
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+  if (R?.pal) { const tex = vinylTexture(R, Math.ceil(2*r), R.key); ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.drawImage(tex, -r, -r, 2*r, 2*r); ctx.restore(); }
   ctx.lineWidth = 1.2*u;
-  for (let rad = r*0.4; rad < r*0.97; rad += r*0.022){ ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${rad % (r*0.088) < r*0.022 ? .09 : .045})`; ctx.stroke(); }
+  for (let rad = r*0.4; rad < r*0.97; rad += r*0.022){ ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${rad % (r*0.088) < r*0.022 ? .08 : .035})`; ctx.stroke(); }
   if (ctx.createConicGradient){
     const s = ctx.createConicGradient(-0.9, cx, cy);
-    [[0,'rgba(255,255,255,0)'],[.1,'rgba(255,255,255,.16)'],[.2,'rgba(255,255,255,0)'],[.5,'rgba(255,255,255,0)'],[.6,'rgba(255,255,255,.12)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
+    [[0,'rgba(255,255,255,0)'],[.1,'rgba(255,255,255,.18)'],[.2,'rgba(255,255,255,0)'],[.5,'rgba(255,255,255,0)'],[.6,'rgba(255,255,255,.12)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
     ctx.fillStyle = s; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
   }
-  // selo central com a arte (gira)
-  const lr = r*0.36;
-  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.clip(); ctx.translate(cx, cy); ctx.rotate(angle); imgSquare(ctx, im, -lr, -lr, 2*lr, '#3ddc6f'); ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3*u; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, r*0.03, 0, 7); ctx.fillStyle = '#0b0b0b'; ctx.fill();
+  // selo central creme
+  const lr = r*0.34;
+  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.fillStyle = '#e9e6dc'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, lr*0.55, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 2*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 3*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.03, 0, 7); ctx.fillStyle = '#1a1a1a'; ctx.fill();
   ctx.restore();
 }
 function drawCase(ctx, x, y, c, im, u){
   ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
   rr(ctx, x, y, c, c, 10*u); ctx.fillStyle = '#1a1a1a'; ctx.fill(); ctx.restore();
   ctx.save(); rr(ctx, x, y, c, c, 10*u); ctx.clip();
-  const sp = c*0.075; // lombada
+  const sp = c*0.075;
   imgSquare(ctx, im, x + sp, y, c - sp, '#333');
   const g = ctx.createLinearGradient(x, 0, x + sp, 0); g.addColorStop(0, '#0e0e0e'); g.addColorStop(.6, '#2b2b2b'); g.addColorStop(1, '#111');
   ctx.fillStyle = g; ctx.fillRect(x, y, sp, c);
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = u;
   for (let yy = y + 14*u; yy < y + c; yy += 12*u){ ctx.beginPath(); ctx.moveTo(x + sp*0.25, yy); ctx.lineTo(x + sp*0.75, yy); ctx.stroke(); }
-  // brilho do acrílico
   const gl = ctx.createLinearGradient(x, y, x + c, y + c);
   gl.addColorStop(0, 'rgba(255,255,255,.28)'); gl.addColorStop(.35, 'rgba(255,255,255,.06)'); gl.addColorStop(.36, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(255,255,255,.08)');
   ctx.fillStyle = gl; ctx.fillRect(x, y, c, c);
@@ -1325,11 +1391,11 @@ function drawSleeve(ctx, x, y, c, im, u){
   ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2*u; ctx.strokeRect(x + u, y + u, c - 2*u, c - 2*u);
 }
 // desenha a arte escolhida dentro do quadrado (x, y, s); a = progresso de entrada, spin = ângulo do disco
-function drawArt(ctx, mode, im, x, y, s, round, st, a, spin, u){
+function drawArt(ctx, mode, im, x, y, s, round, st, a, spin, u, R){
   if (mode === 'cd' || mode === 'vinil'){
     const c = s*0.7, d = mode === 'cd' ? c*0.94 : c*0.97, cyy = y + s/2, slide = easeOut(clamp01((a - 0.35) / 0.65));
     const caseX = x, discX = caseX + c*0.5 + (x + s - d/2 - (caseX + c*0.5)) * slide;
-    if (mode === 'cd') drawCD(ctx, discX, cyy, d/2, im, spin, false, u); else drawVinyl(ctx, discX, cyy, d/2, im, spin, u);
+    if (mode === 'cd') drawCD(ctx, discX, cyy, d/2, im, spin, false, u); else drawVinyl(ctx, discX, cyy, d/2, im, spin, u, R);
     if (mode === 'cd') drawCase(ctx, caseX, cyy - c/2, c, im, u); else drawSleeve(ctx, caseX, cyy - c/2, c, im, u);
   } else if (mode === 'disco'){
     drawCD(ctx, x + s/2, y + s/2, s/2, im, spin, true, u);
@@ -1349,22 +1415,30 @@ function drawArt(ctx, mode, im, x, y, s, round, st, a, spin, u){
   }
 }
 
-/* ---------- arte: preparo (imagens, fundo) + desenho de um quadro ---------- */
+/* ---------- preparo (imagens, cores, fundo) ---------- */
 async function prepareShare(src, o){
-  const Z = SIZES[o.size], st = STYLES[o.style], W = Z.w, H = Z.h, u = W/1080;
-  await document.fonts.load('800 60px "Plus Jakarta Sans"').catch(()=>{});
+  const Z = SIZES[o.size], W = Z.w, H = Z.h, u = W/1080;
+  await Promise.all([document.fonts.load(`800 60px ${FONT}`), document.fonts.load(`700 60px ${SERIF}`)]).catch(()=>{});
   const im = await loadImg(src.img);
-  // fundo pré-renderizado (o desfoque é caro demais para refazer a cada quadro do vídeo)
+  const pal = palette(im);
+  const st = o.style === 'auto' ? autoStyle(pal) : STYLES[o.style];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
   const b = bg.getContext('2d');
   if (st.grad){ const g = b.createLinearGradient(0, 0, W, H); g.addColorStop(0, st.grad[0]); g.addColorStop(1, st.grad[1]); b.fillStyle = g; } else b.fillStyle = st.bg;
   b.fillRect(0, 0, W, H);
   if (st.blur && im){ b.save(); b.filter = `blur(${Math.round(40*u)}px) brightness(.55)`; coverDraw(b, im, -60*u, -60*u, W+120*u, H+120*u); b.restore(); }
-  return { W, H, u, st, im, bg };
+  const R = { W, H, u, st, im, bg, pal, key: src.title };
+  if (src.kind === 'awards') {
+    R.awImgs = {};
+    await Promise.all(awardsSummary(src).top.map(async t => { R.awImgs[t.a] = await loadImg(src.awards?.[t.a]?.img || t.img); }));
+  }
+  return R;
 }
 
 // t = segundos desde o início da animação; null = arte estática (tudo no lugar)
 function drawFrame(canvas, src, o, R, t){
+  if (o.tpl === 'tabela') return drawTable(canvas, src, o, R);
+  if (o.tpl === 'premios') return drawAwards(canvas, src, o, R);
   const { W, H, u, st, im, bg } = R;
   if (canvas.width !== W || canvas.height !== H){ canvas.width = W; canvas.height = H; }
   const ctx = canvas.getContext('2d');
@@ -1373,11 +1447,12 @@ function drawFrame(canvas, src, o, R, t){
   const fadeIn = (a, dy = 30*u) => { ctx.globalAlpha = a; return (1 - a) * dy; };
   ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
   ctx.drawImage(bg, 0, 0);
-  // luz de fundo (pulsa no vídeo)
   const pulse = still ? 1 : 0.75 + 0.25*Math.sin(t*1.6);
-  if (o.style === 'escuro' || o.style === 'neon'){
-    const rgb = o.style === 'neon' ? '255,61,187' : '61,220,111';
-    const g = ctx.createRadialGradient(W*.5, 0, 0, W*.5, 0, H*.8); g.addColorStop(0, `rgba(${rgb},${.22*pulse})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (o.style === 'escuro' || o.style === 'neon' || o.style === 'auto'){
+    const glow = o.style === 'neon' ? 'rgba(255,61,187,' : o.style === 'auto' ? st.accent.replace(/[\d.]+\)$/, '') : 'rgba(61,220,111,';
+    const g = ctx.createRadialGradient(W*.5, 0, 0, W*.5, 0, H*.8);
+    g.addColorStop(0, glow + (o.style === 'auto' ? 0.18 : 0.22)*pulse + ')'); g.addColorStop(1, glow + '0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
 
   const P = o.period, stt = src.stats[P], vertical = H/W >= 0.95;
@@ -1385,7 +1460,6 @@ function drawFrame(canvas, src, o, R, t){
   const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
   const wideArt = o.art === 'cd' || o.art === 'vinil';
 
-  // posição da arte
   let cx, cy, cs, tx, ty, tw;
   if (vertical){
     cs = Math.min(W - 2*M - (wideArt ? 0 : 140*u), H*(H/W > 1.5 ? 0.36 : H/W > 1.1 ? 0.33 : 0.3) * (wideArt ? 1.25 : 1));
@@ -1394,31 +1468,29 @@ function drawFrame(canvas, src, o, R, t){
   const aArt = A(0, 1.1), spin = still ? 0.5 : t * 1.4;
   ctx.save();
   if (!still){ const sc = 0.88 + 0.12*easeOut(clamp01(t/0.9)); ctx.globalAlpha = clamp01(t/0.5); ctx.translate(cx + cs/2, cy + cs/2); ctx.scale(sc, sc); ctx.translate(-(cx + cs/2), -(cy + cs/2)); }
-  drawArt(ctx, o.art, im, cx, cy, cs, src.kind === 'artist', st, aArt, spin, u);
+  drawArt(ctx, o.art, im, cx, cy, cs, src.kind === 'artist', st, aArt, spin, u, R);
   ctx.restore(); ctx.globalAlpha = 1;
 
   const align = vertical ? 'center' : 'left', ax = vertical ? W/2 : tx;
   ctx.textAlign = align;
   let dy;
-  dy = fadeIn(A(0.5)); ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  dy = fadeIn(A(0.5)); ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px ${FONT}`;
   ctx.fillText((KIND_LABEL[src.kind] + ' · Spotify').toUpperCase(), ax, ty + dy); ty += 70*u;
   dy = fadeIn(A(0.65)); ctx.fillStyle = st.text; fitFont(ctx, src.title, 800, 76*u, tw, 34*u); ctx.fillText(clip(ctx, src.title, tw), ax, ty + dy); ty += 52*u;
   if (src.artist){ dy = fadeIn(A(0.8)); ctx.fillStyle = st.muted; fitFont(ctx, src.artist, 600, 38*u, tw, 24*u); ctx.fillText(clip(ctx, src.artist, tw), ax, ty + dy); ty += 30*u; }
   ty += 80*u;
-  // número principal (conta de 0 até o valor no vídeo)
   const count = still ? 1 : easeOut(clamp01((t - 0.9) / 1.6));
   const big = nf.format(Math.round(stt.value * count));
   dy = fadeIn(A(0.9, 0.4)); ctx.fillStyle = st.accent; fitFont(ctx, nf.format(stt.value), 800, (vertical ? 128 : 112)*u, tw, 48*u); ctx.fillText(big, ax, ty + dy); ty += 50*u;
-  dy = fadeIn(A(1.3)); ctx.fillStyle = st.text; ctx.font = `700 ${34*u}px "Plus Jakarta Sans", sans-serif`;
+  dy = fadeIn(A(1.3)); ctx.fillStyle = st.text; ctx.font = `700 ${34*u}px ${FONT}`;
   let line2 = PERIOD_EN[P];
   if (stt.change != null) line2 += `  ${stt.change >= 0 ? '▲' : '▼'} ${Math.abs(stt.change*100).toLocaleString('pt-BR', {maximumFractionDigits:1})}%`;
   ctx.fillText(line2, ax, ty + dy); ty += 46*u;
-  dy = fadeIn(A(1.5)); ctx.fillStyle = st.muted; ctx.font = `600 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  dy = fadeIn(A(1.5)); ctx.fillStyle = st.muted; ctx.font = `600 ${28*u}px ${FONT}`;
   ctx.fillText(`Total: ${nf.format(src.stats.total)} streams`, ax, ty + dy); ty += 30*u;
-  if (!stt.complete) { ty += 12*u; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText(`período parcial · ${stt.covered} de ${stt.days} dias coletados`, ax, ty + dy); ty += 20*u; }
+  if (!stt.complete) { ty += 12*u; ctx.font = `600 ${22*u}px ${FONT}`; ctx.fillText(`período parcial · ${stt.covered} de ${stt.days} dias coletados`, ax, ty + dy); ty += 20*u; }
   ctx.globalAlpha = 1;
 
-  // top faixas
   const footerH = 90*u, room = H - ty - footerH - 50*u, rowH = 66*u;
   const n = o.list ? Math.max(0, Math.min(5, Math.floor((room - 60*u) / rowH))) : 0;
   const top = src.top.slice().sort((a,b) => b.stats[P].value - a.stats[P].value).slice(0, n);
@@ -1427,27 +1499,180 @@ function drawFrame(canvas, src, o, R, t){
     const lx = vertical ? M : tx, lw = vertical ? W - 2*M : tw;
     dy = fadeIn(A(1.8)); ctx.save(); rr(ctx, lx, ty + dy, lw, 40*u + rowH*top.length + 26*u, 22*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
     ty += 52*u; ctx.textAlign = 'left';
-    ctx.fillStyle = st.muted; ctx.font = `800 ${22*u}px "Plus Jakarta Sans", sans-serif`;
+    ctx.fillStyle = st.muted; ctx.font = `800 ${22*u}px ${FONT}`;
     ctx.fillText(src.kind === 'artist' ? 'MÚSICAS EM ALTA' : 'FAIXAS EM ALTA', lx + 28*u, ty + dy); ty += 14*u;
     top.forEach((tr, i) => {
       ty += rowH;
       const a = A(2 + i*0.15, 0.5), dx = (1 - a) * 40*u; ctx.globalAlpha = a;
-      ctx.textAlign = 'left'; ctx.fillStyle = st.accent; ctx.font = `800 ${30*u}px "Plus Jakarta Sans", sans-serif`;
+      ctx.textAlign = 'left'; ctx.fillStyle = st.accent; ctx.font = `800 ${30*u}px ${FONT}`;
       ctx.fillText(String(i+1), lx + 28*u + dx, ty - 18*u);
-      ctx.fillStyle = st.text; ctx.font = `700 ${30*u}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillStyle = st.text; ctx.font = `700 ${30*u}px ${FONT}`;
       const v = fmtN(tr.stats[P].value); ctx.textAlign = 'right';
       ctx.fillText(v, lx + lw - 28*u + dx, ty - 18*u); const vw = ctx.measureText(v).width;
       ctx.textAlign = 'left'; ctx.fillText(clip(ctx, tr.name, lw - 120*u - vw), lx + 76*u + dx, ty - 18*u);
     });
     ctx.globalAlpha = 1;
   }
-  // rodapé: data no canto esquerdo, marca no direito
   ctx.globalAlpha = A(2.4); const fy = H - M + 20*u;
-  ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px ${FONT}`;
   ctx.fillText('Sintonia', W - M, fy); const sw = ctx.measureText('Sintonia').width;
-  ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px ${FONT}`;
   ctx.fillText(clip(ctx, `Atualização: ${date}`, W - 2*M - sw - 40*u), M, fy);
   ctx.globalAlpha = 1;
+}
+
+/* ---------- modelo TABELA: todas as faixas do álbum (ou da era), total, diário e variação ---------- */
+function tableColors(R){
+  const p = R.pal && !R.pal.gray ? R.pal : { h: 0.36, s: 0.55 };
+  return { band: hsl(p.h, p.s*0.85, 0.17), bar: hsl(p.h, p.s*0.8, 0.33), head: hsl(p.h, p.s*0.85, 0.2), sub: hsl(p.h, p.s*0.85, 0.2), total: hsl(p.h, p.s*0.9, 0.12) };
+}
+function drawTable(canvas, src, o, R){
+  const secs = src.sections || [];
+  const W = 1080, M = 0, rowH = 50, C = [400, 230, 230, 220]; // colunas: música, total, diário, variação
+  const nRows = secs.reduce((a, s) => a + s.tracks.length + 1, 0) + (secs.length > 1 ? 1 : 0);
+  const HEAD = 230, BAR = 60, COLS = 60, FOOT = 74;
+  const H = HEAD + BAR + COLS + nRows*rowH + FOOT;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d'), col = tableColors(R);
+  ctx.textBaseline = 'middle';
+  // cabeçalho
+  ctx.fillStyle = col.band; ctx.fillRect(0, 0, W, HEAD);
+  if (R.im) { ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8; ctx.drawImage(R.im, 60, 35, 160, 160); ctx.restore(); }
+  const title = src.tableTitle || src.title, cxT = W/2 + 40;
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+  ctx.font = `700 34px ${SERIF}`; ctx.fillText((src.artist || src.title).toUpperCase(), cxT, 78);
+  fitFont(ctx, title.toUpperCase(), 700, 76, 560, 34, SERIF); ctx.fillText(clip(ctx, title.toUpperCase(), 560), cxT, 140);
+  ctx.textAlign = 'right'; ctx.font = `800 26px ${FONT}`; ctx.globalAlpha = .9; ctx.fillText('Sintonia', W - 50, 70); ctx.globalAlpha = 1;
+  // faixa da data (em inglês, como o "Daily streams")
+  let y = HEAD;
+  const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z') : null;
+  const dtxt = dd ? `${dd.toLocaleDateString('en-US', {weekday:'long'})} - ${dd.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}` : '';
+  ctx.fillStyle = col.bar; ctx.fillRect(0, y, W, BAR);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = `800 30px ${FONT}`; ctx.fillText(dtxt, W/2, y + BAR/2 + 1); y += BAR;
+  // títulos das colunas
+  ctx.fillStyle = col.head; ctx.fillRect(0, y, W, COLS);
+  const xs = [0, C[0], C[0]+C[1], C[0]+C[1]+C[2]], mid = i => xs[i] + C[i]/2;
+  ctx.fillStyle = '#fff'; ctx.font = `800 28px ${FONT}`;
+  ['Song', 'Total Streams', 'Daily Streams', 'Change'].forEach((t, i) => ctx.fillText(t, mid(i), y + COLS/2 + 1));
+  y += COLS;
+  const fmt = v => v == null ? '—' : nf.format(v);
+  const line = (yy) => { ctx.fillStyle = 'rgba(0,0,0,.12)'; for (const x of xs.slice(1)) ctx.fillRect(x, yy, 2, rowH); };
+  let gt = 0, gd = 0, gc = 0;
+  secs.forEach(sec => {
+    let st = 0, sd = 0, sc = 0;
+    sec.tracks.forEach((t, i) => {
+      ctx.fillStyle = i % 2 ? '#f0f0f0' : '#ffffff'; ctx.fillRect(0, y, W, rowH); line(y);
+      ctx.fillStyle = '#111'; fitFont(ctx, t.name, 700, 28, C[0] - 30, 18); ctx.fillText(clip(ctx, t.name, C[0] - 30), mid(0), y + rowH/2 + 1);
+      ctx.font = `500 28px ${FONT}`; ctx.fillText(fmt(t.total), mid(1), y + rowH/2 + 1); ctx.fillText(fmt(t.daily), mid(2), y + rowH/2 + 1);
+      ctx.fillStyle = t.change == null ? '#777' : t.change >= 0 ? '#2e9d4a' : '#e0393e'; ctx.fillText(fmt(t.change), mid(3), y + rowH/2 + 1);
+      st += t.total || 0; sd += t.daily || 0; sc += t.change || 0;
+      y += rowH;
+    });
+    ctx.fillStyle = col.sub; ctx.fillRect(0, y, W, rowH);
+    ctx.fillStyle = '#fff'; const lab = `${sec.name}${sec.day ? ` | Day ${sec.day}` : ''}`;
+    fitFont(ctx, lab, 800, 28, C[0] - 24, 16); ctx.fillText(clip(ctx, lab, C[0] - 24), mid(0), y + rowH/2 + 1);
+    ctx.font = `600 28px ${FONT}`; ctx.fillText(fmt(st), mid(1), y + rowH/2 + 1); ctx.fillText(fmt(sd), mid(2), y + rowH/2 + 1); ctx.fillText(fmt(sc), mid(3), y + rowH/2 + 1);
+    y += rowH; gt += st; gd += sd; gc += sc;
+  });
+  if (secs.length > 1) {
+    ctx.fillStyle = col.total; ctx.fillRect(0, y, W, rowH);
+    ctx.fillStyle = '#fff'; ctx.font = `800 30px ${FONT}`;
+    ctx.fillText('TOTAL', mid(0), y + rowH/2 + 1); ctx.fillText(fmt(gt), mid(1), y + rowH/2 + 1); ctx.fillText(fmt(gd), mid(2), y + rowH/2 + 1); ctx.fillText(fmt(gc), mid(3), y + rowH/2 + 1);
+    y += rowH;
+  }
+  ctx.fillStyle = col.band; ctx.fillRect(0, y, W, FOOT);
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `600 22px ${FONT}`; ctx.textAlign = 'left';
+  ctx.fillText(`Atualização: ${dd ? dd.toLocaleDateString('pt-BR') : '—'} · streams do Spotify`, 40, y + FOOT/2);
+  ctx.textAlign = 'right'; ctx.font = `800 24px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText('Sintonia', W - 40, y + FOOT/2);
+}
+
+/* ---------- modelo PRÊMIOS: resumo das conquistas do artista ---------- */
+const workKey = n => String(n || '').replace(/\s*\((with|feat|ft)[^)]*\)/gi, '').trim();
+function awardsSummary(src){
+  if (src._sum) return src._sum;
+  const rows = src.rows || [], won = rows.filter(r => r.r === 'won');
+  const by = (list, f) => { const m = new Map(); for (const r of list) { const k = f(r); if (!k) continue; m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  const top = by(won.filter(r => r.t !== 'cert'), r => r.a).slice(0, 6).map(([a, w]) => ({ a, w, img: won.find(r => r.a === a && r.img)?.img }));
+  const work = by(won.filter(r => (r.t === 'song' || r.t === 'album') && r.n), r => workKey(r.n))[0];
+  const year = by(won, r => r.y)[0];
+  const years = won.map(r => r.y).filter(Boolean);
+  const recent = won.filter(r => r.y && r.t !== 'cert').sort((a, b) => b.y - a.y).slice(0, 8);
+  const lg = won.filter(r => /latin grammy|grammy latino/i.test(r.a)).length, gr = won.filter(r => /^grammy/i.test(r.a)).length;
+  return src._sum = { won: won.length, total: rows.length, shows: new Set(rows.map(r => r.a)).size, top, work, year, first: years.length ? Math.min(...years) : null,
+                      recent, certs: rows.filter(r => r.t === 'cert').length, lg, gr };
+}
+function drawAwards(canvas, src, o, R){
+  const Z = SIZES[o.size === 'wide' ? 'feed' : o.size], W = Z.w, H = Z.h, tall = H / W > 1.5;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d'), S = awardsSummary(src);
+  const p = R.pal && !R.pal.gray ? R.pal : { h: 0.07, s: 0.35 };
+  const bg = hsl(p.h, Math.min(p.s, 0.45)*0.8, 0.38), ink = '#ffffff', soft = hsl(p.h, 0.3, 0.9);
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, hsl(p.h, Math.min(p.s, .45)*0.8, 0.44)); g.addColorStop(1, hsl(p.h, Math.min(p.s, .45)*0.8, 0.3));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const M = 44, frame = (x, y, w, h) => { ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.strokeRect(x, y, w, h); };
+  ctx.textBaseline = 'alphabetic';
+  // 1) foto do artista com o nome
+  const bh = tall ? 420 : 300;
+  ctx.save(); ctx.beginPath(); ctx.rect(M, M, W - 2*M, bh); ctx.clip();
+  if (R.im) coverDraw(ctx, R.im, M, M, W - 2*M, bh, 0.25); else { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(M, M, W - 2*M, bh); }
+  const gb = ctx.createLinearGradient(0, M + bh*0.45, 0, M + bh); gb.addColorStop(0, 'rgba(0,0,0,0)'); gb.addColorStop(1, 'rgba(0,0,0,.65)'); ctx.fillStyle = gb; ctx.fillRect(M, M, W - 2*M, bh);
+  ctx.restore(); frame(M, M, W - 2*M, bh);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; fitFont(ctx, src.title.toUpperCase(), 700, 74, W - 2*M - 80, 36, SERIF);
+  ctx.fillText(src.title.toUpperCase(), M + 36, M + bh - 34);
+  let y = M + bh + 26;
+  // 2) top premiações (miniatura + vitórias)
+  const th = 270; frame(M, y, W - 2*M, th);
+  const n = Math.max(1, S.top.length), lblW = 110, gap = 16, tw = (W - 2*M - lblW - 30 - gap*(n - 1)) / n;
+  S.top.forEach((t, i) => {
+    const x = M + 22 + i*(tw + gap), ty = y + 22, ts = Math.min(tw, 150);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, ty, tw, th - 44);
+    const im = R.awImgs?.[t.a];
+    if (im) containDraw(ctx, im, x + (tw - ts)/2 + 8, ty + 10, ts - 16, ts - 16);
+    else { ctx.fillStyle = hsl(p.h, 0.35, 0.88); ctx.fillRect(x + 8, ty + 8, tw - 16, ts - 16); ctx.fillStyle = hsl(p.h, 0.45, 0.3); ctx.textAlign = 'center';
+      const ini = t.a.replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter(w => w && !/^(the|of|de|do|da|and|e|awards?|music|premios?)$/i.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+      ctx.font = `800 ${Math.round(ts*0.32)}px ${FONT}`; ctx.fillText(ini, x + tw/2, ty + ts*0.6); }
+    ctx.fillStyle = hsl(p.h, 0.5, 0.22); ctx.textAlign = 'center'; ctx.font = `800 ${Math.round(Math.min(64, tw*0.42))}px ${FONT}`;
+    ctx.fillText(String(t.w), x + tw/2, ty + th - 44 - 22);
+    ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#444'; ctx.fillText(clip(ctx, t.a, tw - 10), x + tw/2, ty + ts + 6);
+  });
+  ctx.save(); ctx.translate(W - M - 40, y + th/2); ctx.rotate(-Math.PI/2); ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+  ctx.font = `900 46px ${FONT}`; ctx.fillText(`TOP ${S.top.length}`, 0, -6); ctx.font = `600 24px ${FONT}`; ctx.fillText('PREMIAÇÕES', 0, 26); ctx.restore();
+  y += th + 26;
+  // 3) números grandes
+  const bw = (W - 2*M - 26) / 2, bh2 = tall ? 220 : 200;
+  frame(M, y, bw, bh2); frame(M + bw + 26, y, bw, bh2);
+  ctx.textAlign = 'left'; ctx.fillStyle = ink; fitFont(ctx, `+${nf.format(S.won)}`, 900, 110, bw - 60, 40); ctx.fillText(`+${nf.format(S.won)}`, M + 30, y + bh2*0.58);
+  ctx.font = `700 30px ${FONT}`; ctx.fillStyle = soft; ctx.fillText('VITÓRIAS', M + 32, y + bh2*0.58 + 46);
+  const rx = M + bw + 26 + 30;
+  ctx.fillStyle = ink; ctx.font = `800 48px ${FONT}`; ctx.fillText(nf.format(S.total), rx, y + 64); ctx.font = `700 22px ${FONT}`; ctx.fillStyle = soft; ctx.fillText('INDICAÇÕES NO TOTAL', rx, y + 94);
+  ctx.fillStyle = ink; ctx.font = `800 44px ${FONT}`; ctx.fillText(nf.format(S.shows), rx, y + bh2 - 50); ctx.font = `700 24px ${FONT}`; ctx.fillStyle = soft; ctx.font = `700 22px ${FONT}`; ctx.fillText('PREMIAÇÕES DIFERENTES', rx, y + bh2 - 20);
+  y += bh2 + 26;
+  // 4) destaques
+  const facts = [];
+  if (S.work) facts.push([`${S.work[1]} VITÓRIAS`, `"${S.work[0]}" É A OBRA MAIS PREMIADA`]);
+  if (S.year) facts.push([`${S.year[1]} VITÓRIAS`, `EM ${S.year[0]}, O ANO MAIS PREMIADO`]);
+  if (S.lg) facts.push([`${S.lg} GRAMMY LATINO${S.lg > 1 ? 'S' : ''}`, S.lg > 1 ? 'CONQUISTADOS PELA ACADEMIA LATINA' : 'CONQUISTADO PELA ACADEMIA LATINA']);
+  if (S.first) facts.push([`DESDE ${S.first}`, 'ANO DA PRIMEIRA VITÓRIA REGISTRADA']);
+  if (S.certs) facts.push([`${S.certs} CERTIFICAÇÕES`, 'DISCOS DE OURO E PLATINA NO ACERVO']);
+  const fh = 140, cols = 2, room = H - y - 110, rowsF = Math.max(1, Math.floor((room + 22) / (fh + 22)));
+  facts.slice(0, rowsF*cols).forEach((f, i) => {
+    const x = M + (i % cols)*(bw + 26), yy = y + Math.floor(i / cols)*(fh + 22);
+    frame(x, yy, bw, fh);
+    ctx.textAlign = 'center'; ctx.fillStyle = ink; fitFont(ctx, f[0], 900, 44, bw - 40, 22); ctx.fillText(f[0], x + bw/2, yy + 62);
+    ctx.fillStyle = soft; fitFont(ctx, f[1], 700, 22, bw - 40, 14); ctx.fillText(clip(ctx, f[1], bw - 30), x + bw/2, yy + 104);
+  });
+  y += Math.ceil(Math.min(facts.length, rowsF*cols) / cols) * (fh + 22);
+  // 5) vitórias recentes (só no Stories, se couber)
+  if (tall && S.recent.length && H - y > 330) {
+    const nR = Math.max(1, Math.min(S.recent.length, Math.floor((H - y - 140 - 70) / 52))), rh = 70 + nR*52; frame(M, y, W - 2*M, rh);
+    ctx.textAlign = 'left'; ctx.fillStyle = ink; ctx.font = `800 28px ${FONT}`; ctx.fillText('VITÓRIAS MAIS RECENTES', M + 30, y + 50);
+    S.recent.slice(0, nR).forEach((r, i) => { ctx.font = `600 24px ${FONT}`; ctx.fillStyle = soft; ctx.fillText(clip(ctx, `${r.y} · ${r.a} — ${r.c}`, W - 2*M - 60), M + 30, y + 98 + i*52); });
+  }
+  // rodapé
+  ctx.textAlign = 'left'; ctx.fillStyle = soft; ctx.font = `600 24px ${FONT}`;
+  const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z').toLocaleDateString('pt-BR') : '—';
+  ctx.fillText(`Atualização: ${dd}`, M, H - 40);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.font = `800 28px ${FONT}`; ctx.fillText('Sintonia', W - M, H - 40);
 }
 
 /* ---------- exportar: imagem (PNG) ou vídeo (MP4/WebM) ---------- */
@@ -1471,7 +1696,6 @@ function videoMime(){
   return ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
     .find(m => { try { return MediaRecorder.isTypeSupported(m); } catch { return false; } }) || null;
 }
-// grava a animação em tempo real a partir do canvas (MediaRecorder)
 function recordMotion(canvas, src, o, R, onProgress){
   return new Promise((ok, no) => {
     const mime = videoMime(); if (!mime || !canvas.captureStream) return no(new Error('Gravação de vídeo não suportada neste aparelho'));
@@ -1493,61 +1717,109 @@ function recordMotion(canvas, src, o, R, onProgress){
   });
 }
 
-Screens.share = function({src}, alive){
-  const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'escuro'), art: store.get('shareArt', 'padrao'),
-              motion: store.get('shareMotion', false), period: S.period, list: true };
+// monta as seções da tabela a partir dos álbuns escolhidos (ordem de lançamento; faixa repetida aparece só uma vez)
+async function tableSections(src, ids){
+  const albums = (await Promise.all(ids.map(id => dataJSON(`artists/${src.artistId}/albums_${id}.json`).catch(() => null)))).filter(a => a?.tracks);
+  albums.sort((a, b) => (a.release || '9').localeCompare(b.release || '9'));
+  const seen = new Set(), key = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s*[\(\[].*?[\)\]]/g, '').trim();
+  const last = src.lastDate ? Date.parse(src.lastDate + 'T00:00:00Z') : Date.now();
+  const secs = albums.map(a => {
+    const tracks = a.tracks.filter(t => { const k = key(t.name); if (seen.has(k)) return false; seen.add(k); return true; })
+      .map(t => ({ name: t.name, total: t.stats?.total ?? null, daily: t.stats?.day.value ?? null, change: t.stats && t.stats.day.prev != null ? t.stats.day.value - t.stats.day.prev : null }));
+    const day = a.release ? Math.floor((last - Date.parse(a.release.slice(0, 10) + 'T00:00:00Z')) / 864e5) + 1 : null;
+    return { name: a.name, day: day > 0 ? day : null, tracks, img: a.img };
+  }).filter(s => s.tracks.length);
+  // título: parte comum dos nomes (ex.: "EQUILIBRIVM" + "EQUILIBRIVM II")
+  const names = secs.map(s => s.name);
+  let common = names[0] || '';
+  for (const n of names.slice(1)) { while (common && !n.toLowerCase().startsWith(common.toLowerCase())) common = common.slice(0, -1); }
+  common = common.replace(/[\s:–-]+$/, '').trim();
+  return { secs, title: secs.length > 1 ? (common.length >= 3 ? common : names.join(' + ')) : names[0], img: secs[0]?.img };
+}
+
+Screens.share = async function({src}, alive){
+  const isAw = src.kind === 'awards';
+  const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'auto'), art: store.get('shareArt', 'padrao'),
+              motion: store.get('shareMotion', false), period: S.period, list: true, tpl: isAw ? 'premios' : store.get('shareTpl', 'card') };
   if (!ARTS[o.art]) o.art = 'padrao';
+  if (!STYLES[o.style]) o.style = 'auto';
+  if (!isAw && o.tpl === 'premios') o.tpl = 'card';
+  if (o.tpl === 'tabela' && src.kind === 'song') o.tpl = 'card';
   const canVideo = !!videoMime();
   if (!canVideo) o.motion = false;
+  // álbuns disponíveis para a tabela
+  let albumList = [], picked = [];
+  if (!isAw && src.kind !== 'song') {
+    try { const a = await dataJSON(`artists/${src.artistId}.json`); albumList = a.albums.slice().sort((x, y) => y.stats.day.value - x.stats.day.value).slice(0, 14); } catch {}
+    if (!alive()) return;
+    picked = src.albumId ? [src.albumId] : albumList.slice(0, 1).map(a => a.id);
+  }
+  const tpls = Object.entries(TEMPLATES).filter(([k]) => isAw ? k === 'premios' : k === 'card' || (k === 'tabela' && src.kind !== 'song'));
   view.innerHTML = `
-    <button class="back" onclick="back()">${I.back}</button>
+    <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
     <h1>Criar imagem</h1>
     <div class="sub" style="margin-bottom:12px">${esc(KIND_LABEL[src.kind])} · ${esc(src.title)}</div>
     <div class="preview"><canvas id="cv"></canvas></div>
-    <h2 style="margin-top:18px">Formato</h2>
-    <div class="seg" id="omotion"><button data-v="0" class="${o.motion?'':'on'}">Imagem (PNG)</button><button data-v="1" class="${o.motion?'on':''}" ${canVideo?'':'disabled title="Este navegador não grava vídeo"'}>Animado (vídeo ${MOTION_SECS}s)</button></div>
-    <h2>Dimensão</h2>
-    <div class="opts" id="osize">${Object.entries(SIZES).map(([k,v]) => `<button data-v="${k}" class="${o.size===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>
-    <h2>Capa</h2>
-    <div class="opts" id="oart">${Object.entries(ARTS).map(([k,v]) => `<button data-v="${k}" class="${o.art===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>
-    <h2>Estilo</h2>
-    <div class="opts" id="ostyle">${Object.entries(STYLES).map(([k,v]) => `<button data-v="${k}" class="${o.style===k?'on':''}"><span class="sw" style="background:${v.grad ? `linear-gradient(135deg,${v.grad[0]},${v.grad[1]})` : v.bg};border-color:${v.accent}"></span><b>${v.label}</b></button>`).join('')}</div>
-    <h2>Período</h2>
+    ${tpls.length > 1 ? `<h2 style="margin-top:18px">Modelo</h2><div class="opts" id="otpl">${tpls.map(([k,v]) => `<button data-v="${k}" class="${o.tpl===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>` : ''}
+    <div id="gAlbums"><h2>Álbuns na tabela</h2><p class="note" style="margin:-6px 0 10px">Escolha um ou mais (ex.: os dois volumes de uma era). Faixas repetidas aparecem uma vez.</p>
+      <div class="chips" id="oalb" style="flex-wrap:wrap">${albumList.map(a => `<button class="chip ${picked.includes(a.id)?'on':''}" data-v="${a.id}">${esc(a.name)}</button>`).join('')}</div></div>
+    <div id="gMotion"><h2 style="margin-top:18px">Formato</h2>
+    <div class="seg" id="omotion"><button data-v="0" class="${o.motion?'':'on'}">Imagem (PNG)</button><button data-v="1" class="${o.motion?'on':''}" ${canVideo?'':'disabled title="Este navegador não grava vídeo"'}>Animado (vídeo ${MOTION_SECS}s)</button></div></div>
+    <div id="gSize"><h2>Dimensão</h2>
+    <div class="opts" id="osize">${Object.entries(SIZES).map(([k,v]) => `<button data-v="${k}" class="${o.size===k?'on':''}" ${isAw && k==='wide' ? 'hidden' : ''}><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div></div>
+    <div id="gArt"><h2>Capa</h2>
+    <div class="opts" id="oart">${Object.entries(ARTS).map(([k,v]) => `<button data-v="${k}" class="${o.art===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div></div>
+    <div id="gStyle"><h2>Estilo</h2>
+    <div class="opts" id="ostyle">${Object.entries(STYLES).map(([k,v]) => `<button data-v="${k}" class="${o.style===k?'on':''}"><span class="sw" style="background:${v.auto ? 'conic-gradient(#c0392b,#e67e22,#f1c40f,#27ae60,#2980b9,#8e44ad,#c0392b)' : v.grad ? `linear-gradient(135deg,${v.grad[0]},${v.grad[1]})` : v.bg};border-color:${v.accent}"></span><b>${v.label}</b></button>`).join('')}</div></div>
+    <div id="gPeriod"><h2>Período</h2>
     <div class="seg" id="operiod">${Object.entries(P).map(([k,v]) => `<button data-v="${k}" class="${o.period===k?'on':''}">${v.label}</button>`).join('')}</div>
-    ${src.top.length ? `<label class="note" style="display:flex;gap:8px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="olist" checked> Mostrar ${src.kind==='artist'?'músicas':'faixas'} em alta</label>` : ''}
-    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px"></button>
+    ${src.top?.length ? `<label class="note" style="display:flex;gap:8px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="olist" checked> Mostrar ${src.kind==='artist'?'músicas':'faixas'} em alta</label>` : ''}</div>
+    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px;margin-top:8px"></button>
     <p class="note" id="snote" style="margin-top:8px"></p>`;
   const cv = $('#cv'), btn = $('#sbtn');
   let R = null, loop = 0, recording = false, prep = Promise.resolve();
-  const label = () => { btn.textContent = o.motion ? 'Gerar e compartilhar vídeo' : 'Compartilhar / salvar imagem';
-    $('#snote').textContent = o.motion ? `O vídeo é gravado em tempo real (${MOTION_SECS}s) no formato ${(videoMime()||'').includes('mp4') ? 'MP4' : 'WebM'}.` : ''; };
+  const isCard = () => o.tpl === 'card';
+  const show = () => {
+    $('#gAlbums').hidden = o.tpl !== 'tabela';
+    $('#gMotion').hidden = !isCard(); $('#gArt').hidden = !isCard(); $('#gPeriod').hidden = !isCard();
+    $('#gSize').hidden = o.tpl === 'tabela'; $('#gStyle').hidden = o.tpl !== 'card';
+    btn.textContent = isCard() && o.motion ? 'Gerar e compartilhar vídeo' : 'Compartilhar / salvar imagem';
+    $('#snote').textContent = isCard() && o.motion ? `O vídeo é gravado em tempo real (${MOTION_SECS}s) no formato ${(videoMime()||'').includes('mp4') ? 'MP4' : 'WebM'}.`
+      : o.tpl === 'tabela' ? 'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.' : o.tpl === 'premios' ? 'As cores vêm da foto do artista.' : '';
+  };
   const stopLoop = () => { cancelAnimationFrame(loop); loop = 0; };
   const play = () => { stopLoop(); const t0 = performance.now();
     const f = () => { if (!alive() || !cv.isConnected) return stopLoop(); if (!recording) drawFrame(cv, src, o, R, ((performance.now() - t0) / 1000) % MOTION_SECS); loop = requestAnimationFrame(f); };
     loop = requestAnimationFrame(f); };
-  // muda tamanho/estilo => refaz o preparo; o resto só redesenha
   const redraw = (reprep) => {
-    if (reprep || !R) prep = prepareShare(src, o).then(r => { R = r; });
-    prep.then(() => { cv.style.aspectRatio = `${R.W}/${R.H}`; if (o.motion) play(); else { stopLoop(); drawFrame(cv, src, o, R, null); } });
+    if (reprep || !R) prep = (async () => {
+      if (o.tpl === 'tabela') { const t = await tableSections(src, picked); src.sections = t.secs; src.tableTitle = t.title; R = await prepareShare({...src, img: t.img || src.img}, o); }
+      else R = await prepareShare(src, o);
+    })();
+    prep.then(() => { if (!alive()) return; cv.style.aspectRatio = `${cv.width || R.W}/${cv.height || R.H}`;
+      if (isCard() && o.motion) play(); else { stopLoop(); drawFrame(cv, src, o, R, null); } cv.style.aspectRatio = `${cv.width}/${cv.height}`; });
   };
-  const bind = (sel, key, persist, reprep, parse = v => v) => $(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled || recording) return; o[key] = parse(b.dataset.v); if (persist) store.set(persist, o[key]);
-    $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); label(); redraw(reprep); };
+  const bind = (sel, key, persist, reprep, parse = v => v) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled || recording) return; o[key] = parse(b.dataset.v); if (persist) store.set(persist, o[key]);
+    $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); show(); redraw(reprep); });
   bind('#osize', 'size', 'shareSize', true); bind('#ostyle', 'style', 'shareStyle', true); bind('#oart', 'art', 'shareArt'); bind('#operiod', 'period');
-  bind('#omotion', 'motion', 'shareMotion', false, v => v === '1');
+  bind('#omotion', 'motion', 'shareMotion', false, v => v === '1'); bind('#otpl', 'tpl', isAw ? null : 'shareTpl', true);
+  $('#oalb').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const id = b.dataset.v;
+    picked = picked.includes(id) ? (picked.length > 1 ? picked.filter(x => x !== id) : picked) : [...picked, id];
+    $('#oalb').querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', picked.includes(x.dataset.v))); redraw(true); };
   if ($('#olist')) $('#olist').onchange = e => { o.list = e.target.checked; redraw(); };
   btn.onclick = async () => {
     if (recording) return;
     await prep;
     try {
-      if (!o.motion){ const blob = await new Promise(r => cv.toBlob(r, 'image/png')); return await exportBlob(blob, fileBase(src.title) + '.png', src.title, 'imagem'); }
+      if (!(isCard() && o.motion)){ const blob = await new Promise(r => cv.toBlob(r, 'image/png')); return await exportBlob(blob, fileBase(src.tableTitle && o.tpl === 'tabela' ? src.tableTitle : src.title) + '.png', src.title, 'imagem'); }
       recording = true; stopLoop(); btn.disabled = true;
       const blob = await recordMotion(cv, src, o, R, t => { btn.textContent = `Gravando vídeo… ${Math.min(MOTION_SECS, Math.floor(t))}/${MOTION_SECS}s`; });
       btn.textContent = 'Preparando…';
       await exportBlob(blob, fileBase(src.title) + (blob.type.includes('mp4') ? '.mp4' : '.webm'), src.title, 'vídeo');
     } catch (e) { toast(e.message?.startsWith('Gravação') ? e.message : 'Não foi possível compartilhar'); console.error(e); }
-    finally { recording = false; btn.disabled = false; label(); if (o.motion) play(); }
+    finally { recording = false; btn.disabled = false; show(); if (isCard() && o.motion) play(); }
   };
-  label(); redraw(true);
+  show(); redraw(true);
 };
 
 /* =================== PRÊMIOS (AWARDS) =================== */
@@ -1582,8 +1854,8 @@ Screens.awards = async function(_, alive){
 
   const shell = () => {
     view.innerHTML = `
-      <span class="kicker">Prêmios</span>
-      <h1 style="font-size:28px;margin-bottom:14px">Awards</h1>
+      <div class="top" style="margin-bottom:14px"><div style="flex:1"><span class="kicker">Prêmios</span><h1 style="font-size:28px">Awards</h1></div>
+        <button class="btn" id="awImg" style="display:flex;align-items:center;gap:6px;height:40px" hidden>${I.img.replace('<svg', '<svg style="width:16px;height:16px"')}Criar imagem</button></div>
       <div class="chips" id="awA" style="margin-bottom:16px">${artists.map(a => `<button class="chip ${a.id===aid?'on':''}" data-a="${a.id}">${esc(a.name)}</button>`).join('')}</div>
       <div id="awBody">${phRows(5)}</div>`;
     $('#awA').onclick = e => { const b = e.target.closest('[data-a]'); if (!b || b.dataset.a === aid) return; aid = b.dataset.a; store.set('awArtist', aid); st.type = 'all'; st.q = ''; st.limit = 120; st.src = 'wiki'; st.res = 'all'; load(); };
@@ -1593,6 +1865,9 @@ Screens.awards = async function(_, alive){
     try { d = await dataJSON(`awards/${aid}.json`); } catch { d = null; }
     if (!alive()) return;
     if (!d || !d.rows.length) { $('#awBody').innerHTML = `<p class="empty">Ainda não encontramos a lista de prêmios deste artista na Wikipédia.<br>Ela é buscada a cada coleta; artistas novos aparecem em até 1 hora.</p>`; return; }
+    const art = artists.find(a => a.id === aid);
+    $('#awImg').hidden = false;
+    $('#awImg').onclick = () => go({type:'share', src:{ kind:'awards', title: d.artistName, img: art?.img, rows: d.rows, awards: d.awards, lastDate: (d.fetchedAt || '').slice(0, 10) }});
     paint();
   };
   const paint = () => {
