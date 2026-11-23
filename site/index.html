@@ -1374,8 +1374,8 @@ Object.assign(Screens, {
         <div id="items"></div>`;
       const list = () => {
         const src = d[tab].filter(x => !q || x.name.toLowerCase().includes(q.toLowerCase()));
-        $('#items').innerHTML = itemList(src, tab, id, limit) + (src.length > limit ? `<button class="btn ghost" id="more" style="margin:14px auto;display:block">Mostrar mais</button>` : '');
-        if ($('#more')) $('#more').onclick = () => { limit += 50; list(); };
+        $('#items').innerHTML = itemList(src, tab, id, limit) + (src.length > limit ? `<button class="btn ghost" id="showMore" style="margin:14px auto;display:block">Mostrar mais (${src.length - limit})</button>` : '');
+        if ($('#showMore')) $('#showMore').onclick = e => { e.stopPropagation(); limit += 50; list(); };
       };
       list();
       bindSeg(paint);
