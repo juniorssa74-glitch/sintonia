@@ -284,6 +284,29 @@ a.pill{text-decoration:none;display:inline-block}
 .livepill{display:inline-flex;align-items:center;gap:6px;background:#0005;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;margin-top:18px;align-self:flex-start}
 .toast{position:absolute;left:50%;bottom:170px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:13px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+.awsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.awsum .kpi{padding:12px 14px}
+.awsum .kpi b{font-size:22px}
+.awg{margin-top:18px}
+.awgh{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.awgh .t{min-width:0;flex:1}
+.awgh b{display:block;font-size:16px;font-weight:800}
+.awgh i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px}
+.awgh.plain{flex-wrap:wrap;gap:4px 8px}
+.awgh.plain b{font-size:18px}
+.awgh.plain i{flex-basis:100%;margin:0}
+.awtype{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:2px 6px}
+.awlist{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:2px 14px}
+.awrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.awrow:last-child{border-bottom:0}
+.awrow .t{min-width:0;flex:1}
+.awrow b{display:block;font-size:14px;font-weight:700;line-height:1.3}
+.awrow i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35}
+.awimg{width:42px;height:42px;border-radius:12px;background:#fff;box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;overflow:hidden;flex:none}
+.awimg img{max-width:34px;max-height:34px;object-fit:contain}
+.awimg.mono{font-size:13px;font-weight:800;box-shadow:none}
+.awres{flex:none;font-size:11px;font-weight:700;color:var(--muted);border-radius:999px;padding:5px 9px;box-shadow:inset 0 0 0 1px var(--line);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.awres.won{color:var(--accent-ink);background:var(--accent);box-shadow:none}
 .ln{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 </style>
 </head>
@@ -303,7 +326,7 @@ a.pill{text-decoration:none;display:inline-block}
     <button data-tab="streams" class="on"><svg class="ln" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>Streams</button>
     <button data-tab="home"><svg class="ln" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Ouvir</button>
     <button data-tab="search"><svg class="ln" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Buscar</button>
-    <button data-tab="library"><svg class="ln" viewBox="0 0 24 24"><path d="M5 4v16M10 4v16M15 5l4 15"/></svg>Biblioteca</button>
+    <button data-tab="awards"><svg class="ln" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Prêmios</button>
   </nav>
 
   <section class="full" id="full" aria-hidden="true">
@@ -453,7 +476,7 @@ function toggleLike(item){
   if (!item) return;
   if (isLiked(item.id)) { S.liked = S.liked.filter(x => x.id !== item.id); toast('Removido das curtidas'); }
   else { S.liked.unshift(item); toast('Adicionado às curtidas'); }
-  store.set('liked', S.liked); syncPlayerUI(); if (S.tab==='library' && !S.stack.length) render();
+  store.set('liked', S.liked); syncPlayerUI(); if (S.stack[S.stack.length-1]?.type==='library') render();
 }
 function pushRecent(entry){
   S.recents = [entry, ...S.recents.filter(x => x.key !== entry.key)].slice(0, 8);
@@ -572,8 +595,8 @@ const Screens = {
     const greet = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
     const f = S.filter;
     view.innerHTML = `
-      <span class="kicker">Ouvir</span>
-      <h1 style="margin-bottom:14px;font-size:28px">${greet}</h1>
+      <div class="top" style="margin-bottom:14px"><div style="flex:1"><span class="kicker">Ouvir</span><h1 style="font-size:28px">${greet}</h1></div>
+        <button class="pill" onclick="go({type:'library'})" style="display:flex;align-items:center;gap:6px"><svg class="ln" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 4v16M10 4v16M15 5l4 15"/></svg>Biblioteca</button></div>
       <div class="chips" style="margin-bottom:16px">
         ${[['all','Tudo'],['music','Música'],['podcast','Podcasts'],['radio','Rádios']].map(([k,l]) => `<button class="chip ${f===k?'on':''}" data-f="${k}">${l}</button>`).join('')}
       </div>
@@ -650,6 +673,7 @@ const Screens = {
   library(){
     const liked = S.liked;
     view.innerHTML = `
+      ${S.stack.length ? `<button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>` : ''}
       <div class="top"><div><span class="kicker">Biblioteca</span><h1>Sua coleção</h1></div></div>
       <button class="row" id="likedRow"><div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#4c2fd6,#9ad8c3);display:grid;place-items:center;flex:none;color:#fff">${I.heartOn}</div>
         <div class="t"><b>Curtidas</b><i>Playlist · ${liked.length} ${liked.length===1?'item':'itens'}</i></div></button>
@@ -1522,6 +1546,103 @@ Screens.share = function({src}, alive){
     finally { recording = false; btn.disabled = false; label(); if (o.motion) play(); }
   };
   label(); redraw(true);
+};
+
+/* =================== PRÊMIOS (AWARDS) =================== */
+// Fonte: Wikipédia em inglês ("List of awards and nominations received by …"), coletada pelo GitHub Actions.
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const AW_TYPE = {artist:'Artista', album:'Álbum', song:'Música', other:'Outros'};
+const AW_GROUP = {year:'Ano', award:'Prêmio', work:'Obra'};
+const TROPHY = '<svg class="ln" viewBox="0 0 24 24" style="width:14px;height:14px;stroke-width:2.2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
+function awMono(name){
+  const words = name.replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter(w => w && !/^(the|of|de|do|da|and|e|awards?|music|prêmio|premios?)$/i.test(w));
+  const ini = (words.slice(0, 2).map(w => w[0]).join('') || name[0] || '?').toUpperCase();
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return `<span class="awimg mono" style="background:hsl(${h} 45% 92%);color:hsl(${h} 45% 28%)" aria-hidden="true">${esc(ini)}</span>`;
+}
+function awImg(d, award){
+  const u = d.awards[award]?.img;
+  return u ? `<span class="awimg"><img src="${esc(u)}" alt="" loading="lazy" onerror="this.parentNode.outerHTML=awMono(${esc(JSON.stringify(award))})"></span>` : awMono(award);
+}
+
+Screens.awards = async function(_, alive){
+  view.innerHTML = `<span class="kicker">Prêmios</span><h1 style="font-size:28px;margin-bottom:16px">Awards</h1>${phRows(5)}`;
+  let sum;
+  try { sum = await dataJSON('summary.json'); } catch { if (alive()) view.innerHTML += '<p class="empty">Sem dados ainda.</p>'; return; }
+  if (!alive()) return;
+  const artists = sum.artists;
+  if (!artists.length) { view.innerHTML = `<span class="kicker">Prêmios</span><h1>Awards</h1><p class="empty">Acompanhe um artista na aba Streams para ver os prêmios dele.</p>`; return; }
+  let aid = store.get('awArtist', artists[0].id); if (!artists.some(a => a.id === aid)) aid = artists[0].id;
+  const st = { res: 'all', group: store.get('awGroup', 'year'), type: 'all', q: '', limit: 120 };
+  let d = null;
+
+  const shell = () => {
+    view.innerHTML = `
+      <span class="kicker">Prêmios</span>
+      <h1 style="font-size:28px;margin-bottom:14px">Awards</h1>
+      <div class="chips" id="awA" style="margin-bottom:16px">${artists.map(a => `<button class="chip ${a.id===aid?'on':''}" data-a="${a.id}">${esc(a.name)}</button>`).join('')}</div>
+      <div id="awBody">${phRows(5)}</div>`;
+    $('#awA').onclick = e => { const b = e.target.closest('[data-a]'); if (!b || b.dataset.a === aid) return; aid = b.dataset.a; store.set('awArtist', aid); st.type = 'all'; st.q = ''; st.limit = 120; load(); };
+  };
+  const load = async () => {
+    shell();
+    try { d = await dataJSON(`awards/${aid}.json`); } catch { d = null; }
+    if (!alive()) return;
+    if (!d || !d.rows.length) { $('#awBody').innerHTML = `<p class="empty">Ainda não encontramos a lista de prêmios deste artista na Wikipédia.<br>Ela é buscada a cada coleta; artistas novos aparecem em até 1 hora.</p>`; return; }
+    paint();
+  };
+  const paint = () => {
+    const rows = d.rows;
+    const awardsN = new Set(rows.map(r => r.a)).size;
+    const tc = {}; rows.forEach(r => tc[r.t] = (tc[r.t] || 0) + 1);
+    const q = norm(st.q);
+    const f = rows.filter(r => (st.res === 'all' || (st.res === 'won' ? r.r === 'won' : r.r !== 'won'))
+      && (st.type === 'all' || r.t === st.type)
+      && (!q || norm(`${r.a} ${r.c} ${r.n} ${r.y}`).includes(q)));
+    const key = r => st.group === 'year' ? String(r.y || '—') : st.group === 'award' ? r.a : (r.t === 'artist' ? d.artistName : r.n || '—');
+    const groups = new Map();
+    for (const r of f) { const k = key(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+    let order = [...groups.entries()];
+    if (st.group === 'year') order.sort((a, b) => b[0].localeCompare(a[0]));
+    else order.sort((a, b) => b[1].filter(r => r.r === 'won').length - a[1].filter(r => r.r === 'won').length || b[1].length - a[1].length || a[0].localeCompare(b[0]));
+    let shown = 0;
+    const html = order.map(([k, list]) => {
+      if (shown >= st.limit) return '';
+      const w = list.filter(r => r.r === 'won').length;
+      const cnt = (w, n) => st.res === 'won' ? `${w} ${w===1?'vitória':'vitórias'}` : st.res === 'nom' ? `${n} ${n===1?'indicação':'indicações'}` : `${w} ${w===1?'vitória':'vitórias'} em ${n} ${n===1?'indicação':'indicações'}`;
+      const head = st.group === 'award'
+        ? `<div class="awgh">${awImg(d, k)}<div class="t"><b>${esc(k)}</b><i>${cnt(w, list.length)}</i></div></div>`
+        : `<div class="awgh plain"><b>${esc(k)}</b>${st.group === 'work' && list[0].t !== 'artist' ? `<span class="awtype">${AW_TYPE[list[0].t]}</span>` : ''}<i>${cnt(w, list.length)}</i></div>`;
+      const items = list.slice().sort((a, b) => (b.y || 0) - (a.y || 0) || (a.r === 'won' ? -1 : 1)).slice(0, Math.max(0, st.limit - shown));
+      shown += items.length;
+      return `<section class="awg">${head}<div class="awlist">${items.map(r => `
+        <div class="awrow">
+          ${st.group === 'award' ? '' : awImg(d, r.a)}
+          <div class="t"><b>${esc(r.c || r.a)}</b><i>${[st.group === 'award' ? '' : r.a, st.group === 'year' ? '' : r.y, st.group === 'work' ? '' : (r.t === 'artist' ? '' : r.n)].filter(Boolean).map(esc).join(' · ')}</i></div>
+          ${r.r === 'won' ? `<span class="awres won">${TROPHY}Venceu</span>` : `<span class="awres">${r.r === 'nominated' ? 'Indicação' : esc(r.rt || 'Outro')}</span>`}
+        </div>`).join('')}</div></section>`;
+    }).join('');
+    $('#awBody').innerHTML = `
+      <div class="awsum">
+        <div class="kpi"><span>Vitórias</span><b style="color:var(--accent)">${nf.format(d.won)}</b></div>
+        <div class="kpi"><span>Indicações</span><b>${nf.format(d.total)}</b></div>
+        <div class="kpi"><span>Premiações</span><b>${nf.format(awardsN)}</b></div>
+      </div>
+      <div class="seg" id="awR" role="tablist" aria-label="Resultado">${[['all','Todos'],['won','Vitórias'],['nom','Só indicações']].map(([k,l]) => `<button role="tab" data-v="${k}" class="${st.res===k?'on':''}">${l}</button>`).join('')}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px"><span class="note" style="font-weight:700">Agrupar por</span>
+        <div class="chips" id="awG">${Object.entries(AW_GROUP).map(([k,l]) => `<button class="chip ${st.group===k?'on':''}" data-v="${k}">${l}</button>`).join('')}</div></div>
+      <div class="chips" id="awT" style="margin-bottom:4px">${[['all','Tudo', rows.length], ...Object.entries(AW_TYPE).filter(([k]) => tc[k]).map(([k,l]) => [k, l, tc[k]])].map(([k,l,n]) => `<button class="chip ${st.type===k?'on':''}" data-v="${k}">${l} · ${n}</button>`).join('')}</div>
+      <input class="filter" id="awQ" placeholder="Buscar prêmio, categoria, música, ano…" value="${esc(st.q)}" aria-label="Buscar nos prêmios">
+      <div id="awL">${html || '<p class="empty">Nada encontrado com esses filtros.</p>'}</div>
+      ${f.length > st.limit ? `<button class="btn ghost" id="awMore" style="width:100%;height:44px;border-radius:14px;margin-top:8px">Mostrar mais (${f.length - st.limit})</button>` : ''}
+      <p class="note" style="margin-top:18px;line-height:1.6">Fonte: Wikipédia, <a href="${esc(d.source?.url || '#')}" target="_blank" rel="noopener">${esc(d.source?.title || '')}</a> (texto sob CC BY-SA). Categorias como aparecem na página, em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString('pt-BR')}; a lista é conferida a cada 3 dias.</p>`;
+    const seg = (sel, k, persist) => $(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; st[k] = b.dataset.v; if (persist) store.set(persist, st[k]); st.limit = 120; paint(); };
+    seg('#awR', 'res'); seg('#awG', 'group', 'awGroup'); seg('#awT', 'type');
+    const qi = $('#awQ'); let t;
+    qi.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = qi.value; st.limit = 120; paint(); const n = $('#awQ'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+    if ($('#awMore')) $('#awMore').onclick = () => { st.limit += 200; paint(); };
+  };
+  load();
 };
 
 /* =================== MÚSICAS DO CELULAR =================== */

@@ -38,6 +38,19 @@ const T = require('../lib/tracker');
   try { log('índice de artistas:', await T.buildArtistIndex()); } catch (e) { log('índice falhou:', e.message); }
   try { await T.buildCharts(); log('paradas atualizadas'); } catch (e) { log('paradas falharam:', e.message); }
 
+  // 4) prêmios (Wikipédia), atualizados a cada 3 dias por artista
+  const { buildAwards } = require('../lib/awards');
+  const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[“”"'’‘]/g, '').replace(/\s+/g, ' ').trim();
+  for (const a of summary) {
+    try {
+      const d = T.readJSON(path.join(T.OUT, 'artists', a.id + '.json'), { songs: [], albums: [] });
+      const strip = s => norm(s.replace(/\s*[\(\[].*?[\)\]]/g, '').replace(/\s+-\s+.*$/, ''));
+      const catalog = { songs: new Set(d.songs.flatMap(s => [norm(s.name), strip(s.name)])), albums: new Set(d.albums.flatMap(s => [norm(s.name), strip(s.name)])) };
+      const r = await buildAwards(a.id, a.name, catalog, m && m[2] === a.id);
+      if (r) log(`prêmios de ${a.name}: ${r.won} vitórias em ${r.total} indicações`);
+    } catch (e) { log('prêmios falharam:', a.name, e.message); }
+  }
+
   if (m && /^acompanhar$/i.test(m[1]) && !tracked.some(a => a.id === m[2])) { console.error('Artista não encontrado no kworb'); process.exit(2); }
   if (failed && failed === tracked.length) process.exit(1);
 })();
