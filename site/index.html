@@ -469,6 +469,7 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Ouvintes mensais':'Oyentes mensuales', 'O gráfico aparece a partir do 2º dia de coleta.':'El gráfico aparece a partir del 2º día de recopilación.',
   'Sobre a premiação':'Sobre la premiación', 'Indicado(a)':'Nominado(a)', 'Ver fotos no acervo':'Ver fotos en el acervo', 'Ler na Wikipédia':'Leer en Wikipedia',
   'Sem descrição disponível para esta premiação.':'No hay descripción disponible para esta premiación.', ' · texto em inglês':' · texto en inglés',
   'Conecte seu Spotify':'Conecta tu Spotify', 'Músicas completas, suas playlists e o que está tocando':'Canciones completas, tus playlists y lo que está sonando', 'Conectar Spotify':'Conectar Spotify',
@@ -490,6 +491,9 @@ const ES = {
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
+  [/^Total (.+) · (.+) ouvintes$/, 'Total $1 · $2 oyentes'],
+  [/^#(\d+) no mundo(.*)$/, (m, r, rest) => `#${r} en el mundo${rest}`],
+  [/^Ouvintes mensais nos últimos (\d+) dias$/, 'Oyentes mensuales en los últimos $1 días'],
   [/^Dados de (.+)$/, 'Datos del $1'],
   [/^Charts de (músicas|álbuns) por país \(Spotify: (diário|semanal); Apple Music e iTunes: atualizados ao longo do dia\)\. Fonte: kworb\.net, coletado de hora em hora\.$/, (m, k, f) => `Charts de ${k === 'músicas' ? 'canciones' : 'álbumes'} por país (Spotify: ${f === 'diário' ? 'diario' : 'semanal'}; Apple Music e iTunes: actualizados durante el día). Fuente: kworb.net, recopilado cada hora.`],
   [/^· dados gerados (.+) · próxima verificação ~(.+)\.$/, '· datos generados $1 · próxima verificación ~$2.'],
@@ -1176,6 +1180,24 @@ function kpis(st){
     <div class="kpi"><span>Total no Spotify</span><b title="${nf.format(st.total)}">${fmtN(st.total)}</b><span class="note">${nf.format(st.total)}</span></div>
   </div>`;
 }
+// ouvintes mensais do Spotify (kworb, com reserva na página do artista)
+const lstChg = v => v == null ? '' : `<span class="badge2 ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '▲' : '▼'} ${nf.format(Math.abs(v))}</span>`;
+function listenersCard(L){
+  if (!L) return '';
+  const s = L.series || [];
+  let spark = `<p class="note" style="margin-top:10px">O gráfico aparece a partir do 2º dia de coleta.</p>`;
+  if (s.length > 1) {
+    const W = 320, H = 56, vs = s.map(x => x[1]), mn = Math.min(...vs), mx = Math.max(...vs), rg = mx - mn || 1;
+    const pts = vs.map((v, i) => `${(i/(vs.length-1)*W).toFixed(1)},${(H - 4 - (v-mn)/rg*(H-8)).toFixed(1)}`).join(' ');
+    spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:56px;margin-top:12px" role="img" aria-label="Ouvintes mensais nos últimos ${s.length} dias"><polyline points="${pts}" fill="none" stroke="var(--viz)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+      <div class="note" style="display:flex;justify-content:space-between"><span>${fmtDate(s[0][0])}</span><span>${fmtDate(s[s.length-1][0])}</span></div>`;
+  }
+  const meta = [L.rank ? `#${L.rank} no mundo` : '', L.peak ? `pico ${fmtN(L.peak)}${L.peakRank ? ` (#${L.peakRank})` : ''}` : ''].filter(Boolean).join(' · ');
+  return `<div class="chart"><h3>Ouvintes mensais</h3>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">
+      <b style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">${nf.format(L.value)}</b>${lstChg(L.change)}</div>
+    ${meta ? `<p class="note" style="margin-top:8px">${meta}</p>` : ''}${spark}</div>`;
+}
 const badge = c => c == null ? '' : `<span class="badge2 ${c >= 0 ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>`;
 
 /* ---------- lista de álbuns/músicas ---------- */
@@ -1226,19 +1248,20 @@ Object.assign(Screens, {
       const last = artists.map(a => a.lastDate).filter(Boolean).sort().pop();
       if (last) $('#kick').textContent = 'Dados de ' + new Date(last+'T12:00:00Z').toLocaleDateString(LOC(), {day:'numeric', month:'long'});
       const imgTag = (a, cls='') => `<img src="${pic(a.img)}" alt="" ${cls} onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">`;
+      const lst = a => a.listeners ? ` · ${fmtN(a.listeners.value)} ouvintes` : '';
       const errLine = a => a.error ? `<span class="note" style="color:var(--bad);display:block;margin-top:2px">Última coleta falhou</span>` : '';
       const list = artists.filter(a => !a.pending);
       $('#alist').innerHTML = list.length ? list.map((a,i) => {
         const v = a.stats[p];
         if (i === 0) return `
         <button class="hcard" data-i="${i}">
-          <div class="hd">${imgTag(a)}<div class="t"><b>${esc(a.name)}</b><span class="note">Total ${fmtN(a.stats.total)}</span>${errLine(a)}</div>${I.right}</div>
+          <div class="hd">${imgTag(a)}<div class="t"><b>${esc(a.name)}</b><span class="note">Total ${fmtN(a.stats.total)}${lst(a)}</span>${errLine(a)}</div>${I.right}</div>
           <div class="num"><div><span>${PER_LABEL[p]}</span><strong>${nf.format(v.value)}</strong></div>${badge(v.change)}</div>
           ${v.complete ? '' : `<div><div class="prog2"><span style="width:${Math.max(4, v.covered/v.days*100)}%"></span></div><span class="note" style="display:block;margin-top:6px">${v.covered} de ${v.days} dias coletados · período ainda parcial</span></div>`}
         </button>`;
         return `
         <button class="acard" data-i="${i}">${imgTag(a)}
-          <div class="t"><b>${esc(a.name)}</b><span class="note">Total ${fmtN(a.stats.total)}</span>${errLine(a)}</div>
+          <div class="t"><b>${esc(a.name)}</b><span class="note">Total ${fmtN(a.stats.total)}${lst(a)}</span>${errLine(a)}</div>
           <div class="v"><strong>${fmtN(v.value)}</strong>${chg(v.change) || `<span class="note">${p === 'day' ? 'no dia' : v.complete ? 'no período' : 'parcial'}</span>`}</div>
         </button>`;
       }).join('') + `<div id="hot"></div>`
@@ -1288,6 +1311,7 @@ Object.assign(Screens, {
           <button class="danger" id="unf">Deixar de acompanhar</button>
         </div>
         ${kpis(st)}
+        ${listenersCard(d.listeners)}
         ${periodSeg()}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
         <div class="chart"><h3>De onde vêm os streams (total)</h3>
