@@ -2104,7 +2104,7 @@ async function spApi(path, opt = {}){
 }
 function spErr(e){
   if (e.status === 403 && /premium/i.test(e.message + e.reason)) return 'Controlar a reprodução exige Spotify Premium.';
-  if (e.status === 403) return 'O Spotify recusou. Confira se sua conta está em "User Management" do app de desenvolvedor.';
+  if (e.status === 403) return `O Spotify recusou (${e.message}). Confira se sua conta está em "User Management" do app de desenvolvedor.`;
   if (e.status === 429) return 'Muitas requisições ao Spotify. Espere um pouco.';
   return 'Spotify: ' + e.message;
 }
