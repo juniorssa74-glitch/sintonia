@@ -309,6 +309,10 @@ a.pill{text-decoration:none;display:inline-block}
 .awimg.mono{font-size:13px;font-weight:800;box-shadow:none}
 .awres{flex:none;font-size:11px;font-weight:700;color:var(--muted);border-radius:999px;padding:5px 9px;box-shadow:inset 0 0 0 1px var(--line);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .awres.won{color:var(--accent-ink);background:var(--accent);box-shadow:none}
+.awhero{height:260px;border-radius:24px;background:#fff;box-shadow:var(--shadow);display:grid;place-items:center;overflow:hidden;padding:16px}
+.awhero img{max-width:100%;max-height:228px;width:auto;height:auto;object-fit:contain;border-radius:12px}
+.awimg.mono.big{width:140px;height:140px;border-radius:32px;font-size:44px}
+button.awrow{font:inherit;color:inherit;cursor:pointer}
 .ln{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 </style>
 </head>
@@ -465,6 +469,8 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Sobre a premiação':'Sobre la premiación', 'Indicado(a)':'Nominado(a)', 'Ver fotos no acervo':'Ver fotos en el acervo', 'Ler na Wikipédia':'Leer en Wikipedia',
+  'Sem descrição disponível para esta premiação.':'No hay descripción disponible para esta premiación.', ' · texto em inglês':' · texto en inglés',
   'Conecte seu Spotify':'Conecta tu Spotify', 'Músicas completas, suas playlists e o que está tocando':'Canciones completas, tus playlists y lo que está sonando', 'Conectar Spotify':'Conectar Spotify',
   'Configurar e conectar':'Configurar y conectar', 'Suas playlists':'Tus playlists', 'Curtidas no Spotify':'Tus me gusta en Spotify', 'Mais ouvidas por você':'Lo que más escuchas', 'últimas semanas':'últimas semanas',
   'Nada tocando no Spotify':'Nada sonando en Spotify', 'Escolha uma playlist ou música abaixo':'Elige una playlist o canción abajo', 'Abrir Spotify':'Abrir Spotify', 'TOCANDO AGORA':'SONANDO AHORA', 'PAUSADO':'EN PAUSA',
@@ -526,6 +532,8 @@ const ES_RULES = [
   [/^(Tudo|Artista|Álbum|Música|Certificação|Reconhecimento|Outros) · (\d+)$/, (m, k, n) => `${ES[k] || k} · ${n}`],
   [/^(Spotify|Apple Music|iTunes) · (\d+)$/, '$1 · $2'],
   [/^Mostrar mais \((\d+)\)$/, 'Mostrar más ($1)'],
+  [/^(.+) neste prêmio$/, '$1 en este premio'],
+  [/^Outros prêmios de "(.+)"$/, 'Otros premios de "$1"'],
   [/^Prêmios reunidos de (.+)\. O mesmo prêmio em mais de um lugar conta uma vez só\. Categorias da Wikipédia em inglês\. Atualizado em (.+)\.$/, 'Premios reunidos de $1. El mismo premio en más de un lugar cuenta una sola vez. Categorías de Wikipedia en inglés. Actualizado el $2.'],
   [/^Adicionando (.+)… aparece em ~2 min$/, 'Agregando $1… aparece en ~2 min'],
   [/^Removendo (.+)… some da lista em ~2 min$/, 'Quitando $1… desaparece de la lista en ~2 min'],
@@ -2314,7 +2322,7 @@ Screens.awards = async function(_, alive){
   const artists = sum.artists;
   if (!artists.length) { view.innerHTML = `<span class="kicker">Prêmios</span><h1>Awards</h1><p class="empty">Acompanhe um artista na aba Streams para ver os prêmios dele.</p>`; return; }
   let aid = store.get('awArtist', artists[0].id); if (!artists.some(a => a.id === aid)) aid = artists[0].id;
-  const st = { res: 'all', group: store.get('awGroup', 'year'), type: 'all', q: '', limit: 120, src: 'wiki' };
+  const st = S.awSt ??= { res: 'all', group: store.get('awGroup', 'year'), type: 'all', q: '', limit: 120, src: 'wiki' };
   let d = null;
 
   const shell = () => {
@@ -2334,6 +2342,7 @@ Screens.awards = async function(_, alive){
     $('#awImg').hidden = false;
     $('#awImg').onclick = () => go({type:'share', src:{ kind:'awards', title: d.artistName, img: art?.img, rows: d.rows, awards: d.awards, lastDate: (d.fetchedAt || '').slice(0, 10) }});
     paint();
+    if (S.awScroll) { view.scrollTop = S.awScroll; S.awScroll = 0; }
   };
   const paint = () => {
     const ex = null, rows = d.rows, TYPES = AW_TYPE, GROUPS = AW_GROUP;
@@ -2365,11 +2374,11 @@ Screens.awards = async function(_, alive){
       const badge = r => ex ? `<span class="awres ${r.t === 'award' ? 'won' : ''}">${r.t === 'award' ? TROPHY : ''}${EX_TYPE[r.t]}</span>`
         : r.t === 'cert' || r.t === 'honor' ? `<span class="awres won">${TROPHY}${AW_TYPE[r.t]}</span>` : r.r === 'won' ? `<span class="awres won">${TROPHY}Venceu</span>` : `<span class="awres">${r.r === 'nominated' ? 'Indicação' : esc(r.rt || 'Outro')}</span>`;
       return `<section class="awg">${head}<div class="awlist">${items.map(r => `
-        <${r.link ? `a href="${esc(r.link)}" target="_blank" rel="noopener"` : 'div'} class="awrow">
+        <button class="awrow" data-ri="${d.rows.indexOf(r)}" style="width:100%;text-align:left">
           ${st.group === 'award' && !ex ? '' : awImg(d, r.a, r)}
           <div class="t"><b>${esc(r.c || r.a)}</b><i>${sub(r).map(esc).join(' · ')}</i></div>
           ${badge(r)}
-        </${r.link ? 'a' : 'div'}>`).join('')}</div></section>`;
+        </button>`).join('')}</div></section>`;
     }).join('');
     const exN = k => rows.filter(r => r.t === k).length;
     $('#awBody').innerHTML = `
@@ -2393,11 +2402,77 @@ Screens.awards = async function(_, alive){
       <p class="note" style="margin-top:18px;line-height:1.6">Prêmios reunidos de ${(d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>${x.license ? ` (${x.license})` : ''}`).join(' e ')}. O mesmo prêmio em mais de um lugar conta uma vez só. Categorias da Wikipédia em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString(LOC())}.</p>`;
     const seg = (sel, k, persist) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; st[k] = b.dataset.v; if (persist) store.set(persist, st[k]); st.limit = 120; if (k === 'src') st.type = 'all'; paint(); });
     seg('#awR', 'res'); seg('#awG', 'group', 'awGroup'); seg('#awT', 'type'); seg('#awS', 'src');
+    $('#awL').onclick = e => { const b = e.target.closest('[data-ri]'); if (b) { S.awScroll = view.scrollTop; go({type:'award', d, row: d.rows[+b.dataset.ri]}); } };
     const qi = $('#awQ'); let t;
     qi.oninput = () => { clearTimeout(t); t = setTimeout(() => { st.q = qi.value; st.limit = 120; paint(); const n = $('#awQ'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
     if ($('#awMore')) $('#awMore').onclick = () => { st.limit += 200; paint(); };
   };
   load();
+};
+
+/* ---------- detalhe de um prêmio: imagem + contexto ---------- */
+// resumo da premiação na Wikipédia, no idioma do app quando existir (senão em inglês)
+async function wikiSummary(page){
+  wikiSummary.c ??= {};
+  const key = page + '|' + LANG;
+  if (wikiSummary.c[key] !== undefined) return wikiSummary.c[key];
+  const want = LANG === 'es' ? 'es' : 'pt';
+  let lang = 'en', title = page.replace(/_/g, ' ');
+  try {
+    const r = await fetch(`https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=langlinks&lllang=${want}&titles=${encodeURIComponent(title)}`).then(r => r.json());
+    const pg = Object.values(r.query.pages)[0];
+    const ll = pg?.langlinks?.[0]?.['*'];
+    if (ll) { lang = want; title = ll; } else if (pg?.title) title = pg.title;
+  } catch {}
+  let s = null;
+  try { const r = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`); if (r.ok) s = await r.json(); } catch {}
+  return wikiSummary.c[key] = s ? { lang, title: s.title, extract: s.extract, img: s.originalimage?.source || s.thumbnail?.source || null,
+    url: s.content_urls?.mobile?.page || s.content_urls?.desktop?.page } : null;
+}
+// versão grande da imagem (miniaturas do acervo e da Wikimedia)
+// (fotos do acervo: versão de 768 px, que existe para fotos em pé; senão a miniatura mesmo. Wikimedia: tamanho padrão de 500 px)
+const bigImg = u => !u ? null : u.replace(/-150x150(\.\w+)$/, '-768x1024$1').replace(/([?&]width=)\d+/, '$1500').replace(/\/(\d+)px-([^/?]+)(\?|$)/, '/500px-$2$3');
+const bigFallback = u => u ? u.replace(/[?&]utm_[^&]*/g, '') : null;
+function awHeroImg(el, list, name){ // tenta cada endereço; no fim, o selo com as iniciais
+  const next = list.shift();
+  if (!next) { el.innerHTML = awMono(name).replace('awimg mono', 'awimg mono big'); return; }
+  const im = new Image(); im.alt = name; im.onload = () => { el.innerHTML = ''; el.appendChild(im); }; im.onerror = () => awHeroImg(el, list, name); im.src = next;
+}
+
+Screens.award = async function({d, row}, alive){
+  const r = row, info = d.awards?.[r.a];
+  const same = d.rows.filter(x => x.a === r.a), won = same.filter(x => x.r === 'won').length;
+  const work = r.n && r.t !== 'artist' ? d.rows.filter(x => x !== r && x.n && norm(x.n) === norm(r.n)) : [];
+  const resTxt = r.t === 'cert' || r.t === 'honor' ? AW_TYPE[r.t] : r.r === 'won' ? 'Venceu' : r.r === 'nominated' ? 'Indicação' : (r.rt || 'Outro');
+  const first = bigImg(r.img) || bigImg(info?.img);
+  const list = arr => arr.slice().sort((a, b) => (b.y || 0) - (a.y || 0)).slice(0, 15).map(x => `
+    <div class="awrow"><div class="t"><b>${esc(x.c || x.a)}</b><i>${[x.y, x === r ? '' : (x.t === 'artist' ? '' : x.n)].filter(Boolean).map(esc).join(' · ')}</i></div>
+    ${x.r === 'won' ? `<span class="awres won">${TROPHY}${x.t === 'cert' || x.t === 'honor' ? AW_TYPE[x.t] : 'Venceu'}</span>` : `<span class="awres">Indicação</span>`}</div>`).join('');
+  view.innerHTML = `
+    <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
+    <div class="awhero" id="awHero">${first ? '' : awMono(r.a).replace('awimg mono', 'awimg mono big')}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 6px;flex-wrap:wrap">
+      <span class="awres ${r.r === 'won' ? 'won' : ''}" style="font-size:13px;padding:6px 12px">${r.r === 'won' ? TROPHY : ''}${esc(resTxt)}</span>
+      ${r.y ? `<span class="chip" style="padding:6px 12px">${r.y}</span>` : ''}
+      ${r.t !== 'artist' ? `<span class="awtype">${esc(AW_TYPE[r.t] || '')}</span>` : ''}
+    </div>
+    <h1 style="font-size:24px">${esc(r.c || r.a)}</h1>
+    <div class="sub" style="font-size:14px;margin-top:6px">${esc(r.a)}</div>
+    ${r.n && r.t !== 'artist' ? `<div class="kpi" style="margin-top:14px"><span>Indicado(a)</span><b style="font-size:17px">${esc(r.n)}</b></div>` : ''}
+    ${r.link ? `<a class="btn ghost" href="${esc(r.link)}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin-top:12px;padding:12px">Ver fotos no acervo</a>` : ''}
+    <h2>Sobre a premiação</h2>
+    <div id="awAbout"><p class="note">${info?.page ? 'carregando…' : 'Sem descrição disponível para esta premiação.'}</p></div>
+    <h2>${esc(d.artistName)} neste prêmio <small>${won} ${won === 1 ? 'vitória' : 'vitórias'} em ${same.length} ${same.length === 1 ? 'indicação' : 'indicações'}</small></h2>
+    <div class="awlist">${list(same)}</div>
+    ${work.length ? `<h2>Outros prêmios de "${esc(r.n)}" <small>${work.length}</small></h2><div class="awlist">${list(work)}</div>` : ''}`;
+  if (first) awHeroImg($('#awHero'), [bigImg(r.img), r.img, bigImg(info?.img), bigFallback(info?.img)].filter(Boolean), r.a);
+  if (!info?.page) return;
+  const s = await wikiSummary(info.page);
+  if (!alive() || !$('#awAbout')) return;
+  if (!s?.extract) { $('#awAbout').innerHTML = '<p class="note">Sem descrição disponível para esta premiação.</p>'; return; }
+  if (!first && s.img) $('#awHero').innerHTML = `<img src="${esc(s.img)}" alt="${esc(r.a)}">`;
+  $('#awAbout').innerHTML = `<p style="line-height:1.6;font-size:14px">${esc(s.extract)}</p>
+    <p class="note" style="margin-top:8px"><a href="${esc(s.url)}" target="_blank" rel="noopener">Ler na Wikipédia</a>${s.lang === 'en' ? ' · texto em inglês' : ''} · CC BY-SA</p>`;
 };
 
 /* =================== MÚSICAS DO CELULAR =================== */
