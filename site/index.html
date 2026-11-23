@@ -256,6 +256,23 @@ a.pill{text-decoration:none;display:inline-block}
 .crow.thead .sv{font-size:11px}
 .crow .fl{line-height:0;display:flex;align-items:center}
 .crow .fl .flg{width:26px;height:19px;object-fit:cover;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.csearch select{flex:1;border:0;background:transparent;font:inherit;font-size:14px;font-weight:600;color:var(--text);outline:none;min-width:0;height:100%}
+button.crow{width:100%;background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;cursor:pointer;padding:0}
+.crow .atn{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-weight:600;font-size:13px;line-height:1.25;padding:6px 0}
+.crow.atrow.st,.crow.atc.st{grid-template-columns:28px 1fr 42px 52px 42px}
+.crow.atrow .pos{font-size:14px}
+.atimg{width:26px;height:26px;border-radius:6px;object-fit:cover}
+.atrack{display:flex;gap:12px;align-items:flex-start;width:100%;padding:12px 0;background:none;border:0;border-bottom:1px solid var(--line);font:inherit;color:inherit;text-align:left;cursor:pointer}
+.atrack:last-child{border-bottom:0}
+.atrack .atimg{width:46px;height:46px;border-radius:10px;flex:none}
+.atrack .t{flex:1;min-width:0}
+.atrack b{display:block;font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atrack i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px}
+.atflags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.atflags span{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;background:var(--bg);border-radius:8px;padding:3px 6px 3px 4px}
+.atflags .flg{width:18px;height:13px;border-radius:2px;object-fit:cover}
+.atflags .ln{width:14px!important;height:14px!important}
+.atflags .more{color:var(--muted);padding:3px 6px}
 .ctools{display:flex;gap:8px;align-items:center;margin:8px 0 0}
 .csearch{flex:1;display:flex;align-items:center;gap:8px;background:var(--card);border-radius:14px;padding:0 12px;height:44px;box-shadow:var(--shadow)}
 .csearch svg{width:18px;height:18px;flex:none}
@@ -483,6 +500,7 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Faixas nos charts do Spotify':'Canciones en los charts de Spotify', 'Todos os países':'Todos los países', 'Faixa':'Canción', 'Filtrar por país':'Filtrar por país',
   'Buscar país':'Buscar país', 'Imagem':'Imagen', 'posições por país':'posiciones por país', 'PAÍSES':'PAÍSES', 'MELHOR POSIÇÃO':'MEJOR POSICIÓN', 'STREAMS NO DIA':'STREAMS DEL DÍA', 'soma dos países':'suma de los países', 'NO TOP 10':'EN EL TOP 10', 'país':'país', 'países':'países', 'PAÍS':'PAÍS', 'POSIÇÃO':'POSICIÓN', 'NOVO':'NUEVO',
   'Streams: quantos streams a música teve no dia do chart, em cada país.':'Streams: cuántos streams tuvo la canción el día del chart, en cada país.',
   'A imagem mostra até 40 países (os da busca, se houver). As cores vêm da capa.':'La imagen muestra hasta 40 países (los de la búsqueda, si hay). Los colores vienen de la portada.',
@@ -513,6 +531,9 @@ const ES = {
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
+  [/^(\d+) (faixa|faixas) em (\d+) (país|países) · chart diário de músicas$/, (m, a, f, b, p) => `${a} ${a === '1' ? 'canción' : 'canciones'} en ${b} ${p} · chart diario de canciones`],
+  [/^(\d+) (país|países) · melhor #(\d+) em (.+)$/, '$1 $2 · mejor #$3 en $4'],
+  [/^(.+) · (\d+) (faixa|faixas)$/, (m, c, n) => `${c} · ${n} ${n === '1' ? 'canción' : 'canciones'}`],
   [/^Nenhum país encontrado para “(.+)”\.$/, 'Ningún país encontrado para “$1”.'],
   [/^Filtro: “(.+)”$/, 'Filtro: “$1”'],
   [/^\+ (\d+) (país|países)$/, '+ $1 $2'],
@@ -1391,9 +1412,11 @@ Object.assign(Screens, {
         ${periodSeg()}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
         ${chartsBlock(d, isAlbum)}
+        ${isAlbum ? albumTrackCharts(d) : ''}
         ${isAlbum ? tracksBlock(d) : ''}`;
       bindSeg(paint);
       bindCharts(d);
+      if (isAlbum) bindAlbumTrackCharts(d, artistId);
       $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
       if ($('#tracks')) $('#tracks').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({type:'streamItem', artistId, kind:'songs', id:b.dataset.song}); };
       view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
@@ -1476,6 +1499,52 @@ function bindCharts(d){
   $('#cimg').onclick = () => go({ type: 'share', src: { kind: 'charts', title: d.name, artist: d.artistName, img: d.img, isAlbum,
     svc: chartSvc, svcLabel: SVC_LABEL[chartSvc], when: chartWhen(d.charts, isAlbum), q: chartQ, rows: chartRows(d.charts), total: (d.charts.list[chartSvc] || []).length,
     lastDate: d.lastDate, artistId: d.artistId } });
+}
+
+/* ---------- faixas do álbum nos charts do Spotify (por faixa ou por país) ---------- */
+let atcCountry = '', atcFb = null;
+function albumTrackCharts(d){
+  atcFb = d.img;
+  const tr = (d.tracks || []).filter(t => t.sp?.length);
+  if (!tr.length) return '';
+  const cs = new Map();
+  for (const t of tr) for (const r of t.sp) { const o = cs.get(r[0]) || { cc: r[0], name: r[1], n: 0, best: 999 }; o.n++; o.best = Math.min(o.best, r[2]); cs.set(r[0], o); }
+  const countries = [...cs.values()].map(o => ({ ...o, label: regionName(o.cc, o.name) })).sort((a, b) => b.n - a.n || a.best - b.best);
+  if (atcCountry && !cs.has(atcCountry)) atcCountry = '';
+  const D = d.charts?.dates || {};
+  const when = D.spotify ? `chart de ${new Date(D.spotify + 'T12:00:00Z').toLocaleDateString(LOC(), {day:'2-digit', month:'2-digit'})}` : '';
+  return `<div id="atc"><h2>Faixas nos charts do Spotify <small style="display:flex;align-items:center;gap:6px">${when ? '<span class="dot"></span>' + when : ''}</small></h2>
+    <p class="note" style="margin:-4px 0 8px">${tr.length} ${tr.length === 1 ? 'faixa' : 'faixas'} em ${countries.length} ${countries.length === 1 ? 'país' : 'países'} · chart diário de músicas</p>
+    <div class="ctools"><label class="csearch">${GLOBE}<select id="atcSel" aria-label="Filtrar por país">
+      <option value="">Todos os países</option>
+      ${countries.map(c => `<option value="${esc(c.cc)}" ${c.cc === atcCountry ? 'selected' : ''}>${esc(c.label)} · ${c.n} ${c.n === 1 ? 'faixa' : 'faixas'}</option>`).join('')}
+    </select></label></div>
+    <div id="atcList">${atcList(tr)}</div></div>`;
+}
+function atcList(tr){
+  if (atcCountry) {
+    const rows = tr.map(t => ({ t, r: t.sp.find(r => r[0] === atcCountry) })).filter(x => x.r).sort((a, b) => a.r[2] - b.r[2]);
+    const st = rows.some(x => x.r[4]);
+    return `<div class="cbox">
+      <div class="crow thead atc${st ? ' st' : ''}"><span></span><span>Faixa</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span>${st ? '<span class="sv">Streams</span>' : ''}<span class="d">24h</span></div>
+      ${rows.map(({ t, r }) => `<button class="crow${st ? ' st' : ''} atrow" data-song="${t.id}"><span class="fl"><img class="atimg" src="${pic(t.img || atcFb)}" alt="" loading="lazy"></span><span class="atn">${esc(t.name)}</span><span class="pos">#${r[2]}</span>${st ? `<span class="sv">${r[4] ? fmtN(r[4]) : '—'}</span>` : ''}${chartDelta(r[3])}</button>`).join('')}
+    </div>`;
+  }
+  const list = tr.slice().sort((a, b) => b.sp.length - a.sp.length || Math.min(...a.sp.map(r => r[2])) - Math.min(...b.sp.map(r => r[2])));
+  return `<div class="cbox">${list.map(t => {
+    const sp = t.sp.slice().sort((a, b) => a[2] - b[2]), best = sp[0];
+    return `<button class="atrack" data-song="${t.id}">
+      <img class="atimg" src="${pic(t.img || atcFb)}" alt="" loading="lazy">
+      <div class="t"><b>${esc(t.name)}</b>
+        <i>${sp.length} ${sp.length === 1 ? 'país' : 'países'} · melhor #${best[2]} em ${esc(regionName(best[0], best[1]))}</i>
+        <div class="atflags">${sp.slice(0, 8).map(r => `<span>${chartFlag(r[0])}#${r[2]}</span>`).join('')}${sp.length > 8 ? `<span class="more">+${sp.length - 8}</span>` : ''}</div>
+      </div></button>`; }).join('')}</div>`;
+}
+function bindAlbumTrackCharts(d, artistId){
+  const box = $('#atc'); if (!box) return;
+  const tr = (d.tracks || []).filter(t => t.sp?.length);
+  $('#atcSel').onchange = e => { atcCountry = e.target.value; $('#atcList').innerHTML = atcList(tr); };
+  $('#atcList').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({ type: 'streamItem', artistId, kind: 'songs', id: b.dataset.song }); };
 }
 
 /* ---------- faixas do álbum ---------- */
