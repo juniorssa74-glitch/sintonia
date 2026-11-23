@@ -30,6 +30,9 @@ const T = require('../lib/tracker');
   tracked = tracked.filter(a => a.lastDate || !a.error);
   T.saveTracked(tracked);
 
+  // 2b) chart Latin do iTunes por país (LivePopBars), no máximo 1x por hora
+  try { await require('../lib/lpb').collectLatin(tracked, log); } catch (e) { log('LivePopBars falhou:', e.message); }
+
   // 3) arquivos publicados
   const summary = [];
   for (const a of tracked) { const s = await T.buildArtist(a.id); if (s) summary.push({ ...s, error: a.error || null }); }

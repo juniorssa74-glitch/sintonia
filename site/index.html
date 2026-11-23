@@ -469,6 +469,7 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'iTunes Latin: chart do gênero latino do iTunes em cada país. Fonte: LivePopBars, coletado de hora em hora.':'iTunes Latin: chart del género latino de iTunes en cada país. Fuente: LivePopBars, recopilado cada hora.',
   'Ouvintes mensais':'Oyentes mensuales', 'O gráfico aparece a partir do 2º dia de coleta.':'El gráfico aparece a partir del 2º día de recopilación.',
   'Sobre a premiação':'Sobre la premiación', 'Indicado(a)':'Nominado(a)', 'Ver fotos no acervo':'Ver fotos en el acervo', 'Ler na Wikipédia':'Leer en Wikipedia',
   'Sem descrição disponível para esta premiação.':'No hay descripción disponible para esta premiación.', ' · texto em inglês':' · texto en inglés',
@@ -1382,7 +1383,7 @@ Object.assign(Screens, {
 });
 
 /* ---------- charts atuais (Spotify, Apple Music, iTunes) ---------- */
-const SVC_LABEL = {spotify:'Spotify', apple:'Apple Music', itunes:'iTunes'};
+const SVC_LABEL = {spotify:'Spotify', apple:'Apple Music', itunes:'iTunes', itunesLatin:'iTunes Latin'};
 const regionName = (() => { const dns = {}; const get = () => { try { return dns[LANG] ??= new Intl.DisplayNames([LOC()], {type:'region'}); } catch { return null; } }; return (cc, fb) => { if (cc === 'global' || cc === 'ww') return 'Global'; try { return (cc.length === 2 && get()?.of(cc.toUpperCase())) || fb; } catch { return fb; } }; })();
 const flagOf = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))) : '🌐';
 function kworbTime(s){ // "2026-11-23 07:35 EST" -> Date
@@ -1409,13 +1410,14 @@ function chartsInner(c, isAlbum){
   const rows = c.list[chartSvc], shown = chartAll ? rows : rows.slice(0, 15);
   const delta = v => !v ? '<span class="d eq">—</span>' : v === 'NE' ? '<span class="d ne">novo</span>' : v === '=' ? '<span class="d eq">=</span>' : v.startsWith('+') ? `<span class="d up">▲ ${v.slice(1)}</span>` : v.startsWith('-') ? `<span class="d down">▼ ${v.slice(1)}</span>` : `<span class="d eq">${esc(v)}</span>`;
   return head + `
-    <div class="chips" id="csvc" style="margin-bottom:6px">${svcs.map(k => `<button class="chip ${k===chartSvc?'on':''}" data-svc="${k}">${SVC_LABEL[k]} · ${c.list[k].length}</button>`).join('')}</div>
+    <div class="chips" id="csvc" style="margin-bottom:6px;flex-wrap:wrap;overflow:visible">${svcs.map(k => `<button class="chip ${k===chartSvc?'on':''}" data-svc="${k}">${SVC_LABEL[k]} · ${c.list[k].length}</button>`).join('')}</div>
     <div class="cbox">
     <div class="crow thead"><span></span><span>País</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span><span class="d">24h</span></div>
     ${shown.map(([cc, name, pos, ch]) => `<div class="crow"><span class="fl">${cc === 'global' || cc === 'ww' ? 'GLB' : esc((cc || '').toUpperCase())}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${delta(ch)}</div>`).join('')}
     </div>
     ${rows.length > shown.length ? `<button class="btn ghost" id="call" style="margin-top:10px;width:100%;height:44px;border-radius:14px">Ver os ${rows.length} países</button>` : ''}
-    <p class="note" style="margin-top:6px">${isAlbum ? 'Charts de álbuns' : 'Charts de músicas'} por país (Spotify: ${isAlbum ? 'semanal' : 'diário'}; Apple Music e iTunes: atualizados ao longo do dia). Fonte: kworb.net, coletado de hora em hora.</p>`;
+    <p class="note" style="margin-top:6px">${isAlbum ? 'Charts de álbuns' : 'Charts de músicas'} por país (Spotify: ${isAlbum ? 'semanal' : 'diário'}; Apple Music e iTunes: atualizados ao longo do dia). Fonte: kworb.net, coletado de hora em hora.</p>
+    ${chartSvc === 'itunesLatin' ? '<p class="note">iTunes Latin: chart do gênero latino do iTunes em cada país. Fonte: LivePopBars, coletado de hora em hora.</p>' : ''}`;
 }
 function bindCharts(d){
   const box = $('#csvc'); if (!box) return;
