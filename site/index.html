@@ -251,6 +251,17 @@ a.pill{text-decoration:none;display:inline-block}
 .crow .d{text-align:right;font-size:12px;font-weight:700}
 .crow .d.up{color:var(--good)} .crow .d.down{color:var(--bad)} .crow .d.ne{color:var(--new)} .crow .d.eq{color:var(--muted)}
 .crow.thead{min-height:32px;font-size:11px;color:var(--muted);font-weight:700}
+.crow.st{grid-template-columns:30px 1fr 46px 62px 52px}
+.crow .sv{text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.crow.thead .sv{font-size:11px}
+.crow .fl{line-height:0;display:flex;align-items:center}
+.crow .fl .flg{width:26px;height:19px;object-fit:cover;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.ctools{display:flex;gap:8px;align-items:center;margin:8px 0 0}
+.csearch{flex:1;display:flex;align-items:center;gap:8px;background:var(--card);border-radius:14px;padding:0 12px;height:44px;box-shadow:var(--shadow)}
+.csearch svg{width:18px;height:18px;flex:none}
+.csearch input{flex:1;border:0;background:transparent;font:inherit;font-size:14px;color:var(--text);outline:none;min-width:0}
+.ctools .btn{height:44px;border-radius:14px;white-space:nowrap}
+.ctools .btn svg{width:18px;height:18px}
 .preview{background:var(--card);border-radius:22px;padding:14px;display:flex;justify-content:center;box-shadow:var(--shadow)}
 .preview canvas{max-width:100%;max-height:52vh;width:auto;height:auto;border-radius:10px;box-shadow:0 12px 30px rgba(18,20,19,.25)}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -472,6 +483,9 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Buscar país':'Buscar país', 'Imagem':'Imagen', 'posições por país':'posiciones por país', 'PAÍSES':'PAÍSES', 'MELHOR POSIÇÃO':'MEJOR POSICIÓN', 'STREAMS NO DIA':'STREAMS DEL DÍA', 'soma dos países':'suma de los países', 'NO TOP 10':'EN EL TOP 10', 'país':'país', 'países':'países', 'PAÍS':'PAÍS', 'POSIÇÃO':'POSICIÓN', 'NOVO':'NUEVO',
+  'Streams: quantos streams a música teve no dia do chart, em cada país.':'Streams: cuántos streams tuvo la canción el día del chart, en cada país.',
+  'A imagem mostra até 40 países (os da busca, se houver). As cores vêm da capa.':'La imagen muestra hasta 40 países (los de la búsqueda, si hay). Los colores vienen de la portada.',
   'Notificações':'Notificaciones', 'As notificações funcionam no app Android. Instale o APK mais novo.':'Las notificaciones funcionan en la app de Android. Instala el APK más reciente.',
   'Permita as notificações do Sintonia nas configurações do Android.':'Permite las notificaciones de Sintonia en los ajustes de Android.',
   'Notificações ligadas: aviso quando uma música entrar em um país novo ou subir ao top 10 ou #1.':'Notificaciones activadas: aviso cuando una canción entre en un país nuevo o suba al top 10 o al #1.',
@@ -499,6 +513,10 @@ const ES = {
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
+  [/^Nenhum país encontrado para “(.+)”\.$/, 'Ningún país encontrado para “$1”.'],
+  [/^Filtro: “(.+)”$/, 'Filtro: “$1”'],
+  [/^\+ (\d+) (país|países)$/, '+ $1 $2'],
+  [/^Fonte: (.+) · (.+)$/, 'Fuente: $1 · $2'],
   [/^Total (.+) · (.+) ouvintes$/, 'Total $1 · $2 oyentes'],
   [/^#(\d+) no mundo(.*)$/, (m, r, rest) => `#${r} en el mundo${rest}`],
   [/^Ouvintes mensais nos últimos (\d+) dias$/, 'Oyentes mensuales en los últimos $1 días'],
@@ -1398,7 +1416,35 @@ const flagOf = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUp
 function kworbTime(s){ // "2026-11-23 07:35 EST" -> Date
   const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) (EST|EDT)$/.exec(s || ''); return m ? new Date(`${m[1]}T${m[2]}:00${m[3]==='EDT'?'-04:00':'-05:00'}`) : null;
 }
-let chartSvc = null, chartAll = false;
+let chartSvc = null, chartAll = false, chartQ = '';
+const nz = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const flagUrl = cc => cc && cc.length === 2 ? `https://flagcdn.com/w40/${cc.toLowerCase()}.png` : null;
+const GLOBE = '<svg class="ln" viewBox="0 0 24 24" style="width:22px;height:22px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>';
+const chartFlag = cc => flagUrl(cc) ? `<img class="flg" src="${flagUrl(cc)}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc((cc||'').toUpperCase())}'))">` : GLOBE;
+function chartWhen(c, isAlbum){
+  const D = c.dates || {}, loc = LANG === 'es' ? 'es-419' : 'pt-BR';
+  const dayTxt = d => new Date(d + 'T12:00:00Z').toLocaleDateString(loc, {day:'2-digit', month:'2-digit'});
+  const timeTxt = d => new Date(d).toLocaleString(loc, {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const fallback = kworbTime(c.updated) || (c.fetchedAt && new Date(c.fetchedAt));
+  return chartSvc === 'spotify' ? (isAlbum ? 'chart semanal' : D.spotify ? `chart de ${dayTxt(D.spotify)}` : '')
+    : D[chartSvc] ? `atualizado ${timeTxt(D[chartSvc])}` : fallback ? `atualizado ${timeTxt(fallback)}` : '';
+}
+// linhas do serviço escolhido, filtradas pela busca (nome do país em PT/ES/EN ou sigla)
+function chartRows(c){
+  const rows = c.list[chartSvc] || [], q = nz(chartQ);
+  return q ? rows.filter(r => [regionName(r[0], r[1]), r[1], r[0]].some(t => nz(t).includes(q))) : rows;
+}
+const chartDelta = v => !v ? '<span class="d eq">—</span>' : v === 'NE' ? '<span class="d ne">novo</span>' : v === '=' ? '<span class="d eq">=</span>' : v.startsWith('+') ? `<span class="d up">▲ ${v.slice(1)}</span>` : v.startsWith('-') ? `<span class="d down">▼ ${v.slice(1)}</span>` : `<span class="d eq">${esc(v)}</span>`;
+function chartList(c){
+  const all = c.list[chartSvc] || [], rows = chartRows(c), shown = chartAll || chartQ ? rows : rows.slice(0, 15);
+  const st = all.some(r => r[4]);
+  if (!rows.length) return `<p class="note" style="padding:14px 0">Nenhum país encontrado para “${esc(chartQ)}”.</p>`;
+  return `<div class="cbox">
+    <div class="crow thead${st ? ' st' : ''}"><span></span><span>País</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span>${st ? '<span class="sv">Streams</span>' : ''}<span class="d">24h</span></div>
+    ${shown.map(([cc, name, pos, ch, s]) => `<div class="crow${st ? ' st' : ''}"><span class="fl" title="${esc((cc || '').toUpperCase())}">${chartFlag(cc)}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${st ? `<span class="sv">${s ? fmtN(s) : '—'}</span>` : ''}${chartDelta(ch)}</div>`).join('')}
+    </div>
+    ${rows.length > shown.length ? `<button class="btn ghost" id="call" style="margin-top:10px;width:100%;height:44px;border-radius:14px">Ver os ${rows.length} países</button>` : ''}`;
+}
 function chartsBlock(d, isAlbum){
   const c = d.charts;
   return c ? `<div id="chartsBox">${chartsInner(c, isAlbum)}</div>` : '';
@@ -1406,33 +1452,30 @@ function chartsBlock(d, isAlbum){
 function chartsInner(c, isAlbum){
   const svcs = Object.keys(SVC_LABEL).filter(k => c.list[k]?.length);
   if (svcs.length && !svcs.includes(chartSvc)) chartSvc = svcs[0];
-  // data real de cada serviço: Spotify publica o chart do dia anterior; Apple Music e iTunes, ao longo do dia
-  const D = c.dates || {}, loc = LANG === 'es' ? 'es-419' : 'pt-BR';
-  const dayTxt = d => new Date(d + 'T12:00:00Z').toLocaleDateString(loc, {day:'2-digit', month:'2-digit'});
-  const timeTxt = d => new Date(d).toLocaleString(loc, {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-  const fallback = kworbTime(c.updated) || (c.fetchedAt && new Date(c.fetchedAt));
-  const when = !svcs.length ? (fallback ? 'atualizado ' + timeTxt(fallback) : '')
-    : chartSvc === 'spotify' ? (isAlbum ? 'chart semanal' : D.spotify ? `chart de ${dayTxt(D.spotify)}` : '')
-    : D[chartSvc] ? `atualizado ${timeTxt(D[chartSvc])}` : fallback ? `atualizado ${timeTxt(fallback)}` : '';
+  const when = chartWhen(c, isAlbum);
   const head = `<h2>Charts agora <small style="display:flex;align-items:center;gap:6px">${when ? '<span class="dot"></span>' + when : ''}</small></h2>`;
   if (!svcs.length) return head + `<p class="note">${isAlbum ? 'Este álbum' : 'Esta música'} não está em nenhum chart do Spotify, Apple Music ou iTunes agora.</p>`;
-  const rows = c.list[chartSvc], shown = chartAll ? rows : rows.slice(0, 15);
-  const delta = v => !v ? '<span class="d eq">—</span>' : v === 'NE' ? '<span class="d ne">novo</span>' : v === '=' ? '<span class="d eq">=</span>' : v.startsWith('+') ? `<span class="d up">▲ ${v.slice(1)}</span>` : v.startsWith('-') ? `<span class="d down">▼ ${v.slice(1)}</span>` : `<span class="d eq">${esc(v)}</span>`;
   return head + `
     <div class="chips" id="csvc" style="margin-bottom:6px;flex-wrap:wrap;overflow:visible">${svcs.map(k => `<button class="chip ${k===chartSvc?'on':''}" data-svc="${k}">${SVC_LABEL[k]} · ${c.list[k].length}</button>`).join('')}</div>
-    <div class="cbox">
-    <div class="crow thead"><span></span><span>País</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span><span class="d">24h</span></div>
-    ${shown.map(([cc, name, pos, ch]) => `<div class="crow"><span class="fl">${cc === 'global' || cc === 'ww' ? 'GLB' : esc((cc || '').toUpperCase())}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${delta(ch)}</div>`).join('')}
+    <div class="ctools">
+      <label class="csearch">${I.search || ''}<input id="cq" type="search" placeholder="Buscar país" value="${esc(chartQ)}" autocomplete="off" aria-label="Buscar país"></label>
+      <button class="btn ghost" id="cimg" aria-label="Criar imagem dos charts">${I.img}Imagem</button>
     </div>
-    ${rows.length > shown.length ? `<button class="btn ghost" id="call" style="margin-top:10px;width:100%;height:44px;border-radius:14px">Ver os ${rows.length} países</button>` : ''}
+    <div id="clist">${chartList(c)}</div>
     <p class="note" style="margin-top:6px">${isAlbum ? 'Charts de álbuns' : 'Charts de músicas'} por país (Spotify: ${isAlbum ? 'semanal' : 'diário'}; Apple Music e iTunes: atualizados ao longo do dia). Fonte: kworb.net, coletado de hora em hora.</p>
+    ${chartSvc === 'spotify' && !isAlbum ? '<p class="note">Streams: quantos streams a música teve no dia do chart, em cada país.</p>' : ''}
     ${chartSvc === 'itunesLatin' ? '<p class="note">iTunes Latin: chart do gênero latino do iTunes em cada país. Fonte: LivePopBars, coletado de hora em hora.</p>' : ''}`;
 }
 function bindCharts(d){
-  const box = $('#csvc'); if (!box) return;
-  const repaint = () => { $('#chartsBox').innerHTML = chartsInner(d.charts, d.kind === 'albums'); bindCharts(d); };
-  box.onclick = e => { const b = e.target.closest('[data-svc]'); if (!b) return; chartSvc = b.dataset.svc; chartAll = false; repaint(); };
-  if ($('#call')) $('#call').onclick = () => { chartAll = true; repaint(); };
+  const box = $('#chartsBox'); if (!box || !$('#csvc')) return;
+  const isAlbum = d.kind === 'albums';
+  const repaint = () => { box.innerHTML = chartsInner(d.charts, isAlbum); bindCharts(d); };
+  $('#csvc').onclick = e => { const b = e.target.closest('[data-svc]'); if (!b) return; chartSvc = b.dataset.svc; chartAll = false; repaint(); };
+  $('#clist').onclick = e => { if (e.target.closest('#call')) { chartAll = true; $('#clist').innerHTML = chartList(d.charts); } };
+  $('#cq').oninput = e => { chartQ = e.target.value; chartAll = false; $('#clist').innerHTML = chartList(d.charts); };
+  $('#cimg').onclick = () => go({ type: 'share', src: { kind: 'charts', title: d.name, artist: d.artistName, img: d.img, isAlbum,
+    svc: chartSvc, svcLabel: SVC_LABEL[chartSvc], when: chartWhen(d.charts, isAlbum), q: chartQ, rows: chartRows(d.charts), total: (d.charts.list[chartSvc] || []).length,
+    lastDate: d.lastDate, artistId: d.artistId } });
 }
 
 /* ---------- faixas do álbum ---------- */
@@ -1481,8 +1524,9 @@ const TEMPLATES = {
   tabela:  {label:'Tabela moderna', sub:'resumo + faixas com % de variação'},
   classica:{label:'Tabela clássica', sub:'total, diário e variação'},
   premios: {label:'Prêmios', sub:'resumo das conquistas'},
+  charts:  {label:'Charts', sub:'posições por país'},
 };
-const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música', awards:'Prêmios'};
+const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música', awards:'Prêmios', charts:'Charts'};
 const PERIOD_EN = {day:'Daily streams', week:'Weekly streams', month:'Monthly streams'};
 const MOTION_SECS = 8;
 
@@ -1681,6 +1725,7 @@ async function prepareShare(src, o){
   b.fillRect(0, 0, W, H);
   if (st.blur && im){ b.save(); b.filter = `blur(${Math.round(40*u)}px) brightness(.55)`; coverDraw(b, im, -60*u, -60*u, W+120*u, H+120*u); b.restore(); }
   const R = { W, H, u, st, im, bg, pal, key: src.title };
+  if (src.kind === 'charts') { R.flags = {}; await Promise.all([...new Set((src.rows || []).slice(0, 41).map(r => r[0]))].map(async cc => { const f = flagUrl(cc); if (f) R.flags[cc] = await loadImg(f); })); }
   if (src.kind === 'awards') {
     R.awImgs = {};
     await Promise.all(awardsSummary(src).top.map(async t => { R.awImgs[t.a] = await loadImg(src.awards?.[t.a]?.img || t.img); }));
@@ -1693,6 +1738,7 @@ function drawFrame(canvas, src, o, R, t){
   if (o.tpl === 'classica') return drawTable(canvas, src, o, R);
   if (o.tpl === 'tabela') return drawTable2(canvas, src, o, R);
   if (o.tpl === 'premios') return drawAwards(canvas, src, o, R);
+  if (o.tpl === 'charts') return drawChartsImg(canvas, src, o, R);
   const { W, H, u, st, im, bg } = R;
   if (canvas.width !== W || canvas.height !== H){ canvas.width = W; canvas.height = H; }
   const ctx = canvas.getContext('2d');
@@ -1948,6 +1994,81 @@ function drawTable2(canvas, src, o, R){
   if (o.mark ?? 'Sintonia') { ctx.textAlign = 'right'; ctx.fillStyle = TXT; ctx.font = `800 20px ${FONT}`; ctx.fillText(o.mark ?? 'Sintonia', W - M, H - 22); }
 }
 
+/* ---------- modelo CHARTS: posições por país (com bandeira, variação e streams) ---------- */
+function drawChartsImg(canvas, src, o, R){
+  const all = src.rows || [], MAXR = 40, rows = all.slice(0, MAXR), more = all.length - rows.length;
+  const st = rows.some(r => r[4]);
+  const W = 1080, M = 40, rowH = 62, HEAD = 330, KPI = 150, THEAD = 52, FOOT = 64;
+  const H = HEAD + KPI + THEAD + rows.length * rowH + (more > 0 ? rowH : 0) + 20 + FOOT;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const p = R.pal && !R.pal.gray ? R.pal : { h: 0.38, s: 0.7 };
+  const BG = '#121214', CARD = '#1e1e21', LINE = 'rgba(255,255,255,.08)', TXT = '#f5f5f7', MUT = '#9a9aa2';
+  const ACC = hsl(p.h, Math.max(p.s, 0.6), 0.6), UP = '#22c55e', DOWN = '#ff3b5c', NEW = '#60a5fa';
+  const EMO = `, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"`;
+  const flagTxt = cc => cc === 'global' || cc === 'ww' || !cc ? '🌐' : flagOf(cc);
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H); ctx.textBaseline = 'alphabetic';
+
+  // capa + títulos
+  const cs = 250;
+  ctx.save(); rr(ctx, M, M, cs, cs, 24); ctx.clip();
+  if (R.im) coverDraw(ctx, R.im, M, M, cs, cs); else { ctx.fillStyle = CARD; ctx.fillRect(M, M, cs, cs); }
+  ctx.restore();
+  const rx = M + cs + 36, rw = W - M - rx;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ACC; ctx.font = `800 22px ${FONT}`; ctx.fillText(`${(src.svcLabel || '').toUpperCase()} · CHARTS`, rx, M + 34);
+  const title = src.title || '';
+  ctx.fillStyle = TXT; fitFont(ctx, title, 900, 62, rw, 30); ctx.fillText(clip(ctx, title, rw), rx, M + 108);
+  if (src.artist) { ctx.fillStyle = MUT; fitFont(ctx, src.artist, 700, 32, rw, 20); ctx.fillText(clip(ctx, src.artist, rw), rx, M + 156); }
+  const tw = Math.min(rw, 260), ug = ctx.createLinearGradient(rx, 0, rx + tw, 0); ug.addColorStop(0, ACC); ug.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ug; rr(ctx, rx, M + 182, tw, 5, 2.5); ctx.fill();
+  if (src.when) { ctx.fillStyle = MUT; ctx.font = `600 22px ${FONT}`; ctx.fillText(src.when.toUpperCase(), rx, M + 228); }
+  if (src.q) { ctx.fillStyle = MUT; ctx.font = `600 20px ${FONT}`; ctx.fillText(`Filtro: “${src.q}”`, rx, M + 262); }
+
+  // cartões: países, melhor posição, streams (ou top 10)
+  const y1 = HEAD, gap = 16, cw = (W - 2*M - 2*gap) / 3, ch = KPI - 24;
+  const best = all.reduce((a, r) => !a || r[2] < a[2] ? r : a, null);
+  const sumS = all.reduce((a, r) => a + (r[4] || 0), 0), top10 = all.filter(r => r[2] <= 10).length;
+  const cards = [
+    ['PAÍSES', nf.format(all.length), src.total && src.total !== all.length ? `de ${src.total}` : ''],
+    ['MELHOR POSIÇÃO', best ? `#${best[2]}` : '—', best ? regionName(best[0], best[1]) : ''],
+    st ? ['STREAMS NO DIA', fmtN(sumS), 'soma dos países'] : ['NO TOP 10', nf.format(top10), top10 === 1 ? 'país' : 'países'],
+  ];
+  cards.forEach(([lab, val, sub], i) => {
+    const x = M + i * (cw + gap);
+    ctx.fillStyle = i === 1 ? hsl(p.h, Math.max(p.s, .6), 0.3) : CARD; rr(ctx, x, y1, cw, ch, 20); ctx.fill();
+    ctx.textAlign = 'left'; ctx.fillStyle = i === 1 ? 'rgba(255,255,255,.85)' : MUT; ctx.font = `800 16px ${FONT}`; ctx.fillText(lab, x + 20, y1 + 32);
+    ctx.fillStyle = '#fff'; fitFont(ctx, val, 900, 46, cw - 40, 24); ctx.fillText(val, x + 20, y1 + 84);
+    if (sub) { ctx.fillStyle = i === 1 ? 'rgba(255,255,255,.85)' : MUT; ctx.font = `600 18px ${FONT}${EMO}`; ctx.fillText(clip(ctx, sub, cw - 40), x + 20, y1 + 112); }
+  });
+
+  // tabela
+  const X = { fl: M + 14, name: M + 64, d: W - M - 14 };
+  X.s = st ? X.d - 120 : null; X.pos = (st ? X.s : X.d) - 150;
+  let y = HEAD + KPI;
+  ctx.fillStyle = MUT; ctx.font = `800 16px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('PAÍS', X.name, y + 32);
+  ctx.textAlign = 'right'; ctx.fillText('POSIÇÃO', X.pos, y + 32); if (st) ctx.fillText('STREAMS', X.s, y + 32); ctx.fillText('24H', X.d, y + 32);
+  y += THEAD; ctx.fillStyle = LINE; ctx.fillRect(M, y - 1, W - 2*M, 2);
+  const dTxt = v => !v ? ['—', MUT] : v === 'NE' ? ['NOVO', NEW] : v === '=' ? ['=', MUT] : v[0] === '+' ? [`▲ ${v.slice(1)}`, UP] : v[0] === '-' ? [`▼ ${v.slice(1)}`, DOWN] : [v, MUT];
+  for (const [cc, name, pos, chg, s] of rows) {
+    const mid = y + rowH/2 + 9;
+    const fim = R.flags?.[cc];
+    if (fim) { ctx.save(); rr(ctx, X.fl, mid - 25, 38, 28, 5); ctx.clip(); coverDraw(ctx, fim, X.fl, mid - 25, 38, 28); ctx.restore(); }
+    else { ctx.textAlign = 'left'; ctx.font = `800 18px ${FONT}`; ctx.fillStyle = MUT; ctx.fillText(cc === 'global' || cc === 'ww' ? 'GLB' : (cc || '').toUpperCase(), X.fl, mid - 2); }
+    ctx.textAlign = 'left'; ctx.font = `700 25px ${FONT}`; ctx.fillStyle = TXT; ctx.fillText(clip(ctx, regionName(cc, name), X.pos - 90 - X.name), X.name, mid);
+    ctx.textAlign = 'right'; ctx.font = `900 27px ${FONT}`; ctx.fillStyle = pos <= 10 ? ACC : TXT; ctx.fillText(`#${pos}`, X.pos, mid);
+    if (st) { ctx.font = `700 23px ${FONT}`; ctx.fillStyle = s ? TXT : MUT; ctx.fillText(s ? nf.format(s) : '—', X.s, mid); }
+    const [dt, dc] = dTxt(chg); ctx.font = `800 20px ${FONT}`; ctx.fillStyle = dc; ctx.fillText(dt, X.d, mid);
+    y += rowH; ctx.fillStyle = LINE; ctx.fillRect(M, y - 1, W - 2*M, 2);
+  }
+  if (more > 0) { ctx.textAlign = 'left'; ctx.fillStyle = MUT; ctx.font = `700 22px ${FONT}`; ctx.fillText(`+ ${more} ${more === 1 ? 'país' : 'países'}`, X.name, y + rowH/2 + 8); y += rowH; }
+
+  // rodapé
+  ctx.textAlign = 'left'; ctx.fillStyle = MUT; ctx.font = `600 18px ${FONT}`;
+  ctx.fillText(`Fonte: ${src.svc === 'itunesLatin' ? 'LivePopBars' : 'kworb.net'} · ${src.svcLabel}`, M, H - 26);
+  if (o.mark ?? 'Sintonia') { ctx.textAlign = 'right'; ctx.fillStyle = TXT; ctx.font = `800 20px ${FONT}`; ctx.fillText(o.mark ?? 'Sintonia', W - M, H - 26); }
+}
+
 /* ---------- modelo PRÊMIOS: resumo das conquistas do artista ---------- */
 const workKey = n => String(n || '').replace(/\s*\((with|feat|ft)[^)]*\)/gi, '').trim();
 function awardsSummary(src){
@@ -2100,24 +2221,24 @@ async function tableSections(src, ids){
 }
 
 Screens.share = async function({src}, alive){
-  const isAw = src.kind === 'awards';
+  const isAw = src.kind === 'awards', isCh = src.kind === 'charts';
   const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'auto'), art: store.get('shareArt', 'padrao'),
-              motion: store.get('shareMotion', false), period: S.period, list: true, mark: store.get('shareMark', 'Sintonia'), photo: null, tpl: isAw ? 'premios' : store.get('shareTpl', 'card') };
+              motion: store.get('shareMotion', false), period: S.period, list: true, mark: store.get('shareMark', 'Sintonia'), photo: null, tpl: isAw ? 'premios' : isCh ? 'charts' : store.get('shareTpl', 'card') };
   if (!ARTS[o.art]) o.art = 'padrao';
   if (!STYLES[o.style]) o.style = 'auto';
-  if (!isAw && o.tpl === 'premios') o.tpl = 'card';
+  if ((!isAw && o.tpl === 'premios') || (!isCh && o.tpl === 'charts')) o.tpl = 'card';
   const isTbl = () => o.tpl === 'tabela' || o.tpl === 'classica';
   if (isTbl() && src.kind === 'song') o.tpl = 'card';
   const canVideo = !!videoMime();
   if (!canVideo) o.motion = false;
   // álbuns disponíveis para a tabela
   let albumList = [], picked = [];
-  if (!isAw && src.kind !== 'song') {
+  if (!isAw && !isCh && src.kind !== 'song') {
     try { const a = await dataJSON(`artists/${src.artistId}.json`); albumList = a.albums.slice().sort((x, y) => y.stats.day.value - x.stats.day.value).slice(0, 14); } catch {}
     if (!alive()) return;
     picked = src.albumId ? [src.albumId] : albumList.slice(0, 1).map(a => a.id);
   }
-  const tpls = Object.entries(TEMPLATES).filter(([k]) => isAw ? k === 'premios' : k === 'card' || ((k === 'tabela' || k === 'classica') && src.kind !== 'song'));
+  const tpls = Object.entries(TEMPLATES).filter(([k]) => isAw ? k === 'premios' : isCh ? k === 'charts' : k === 'card' || ((k === 'tabela' || k === 'classica') && src.kind !== 'song'));
   view.innerHTML = `
     <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
     <h1>Criar imagem</h1>
@@ -2153,10 +2274,10 @@ Screens.share = async function({src}, alive){
   const show = () => {
     $('#gAlbums').hidden = !isTbl();
     $('#gMotion').hidden = !isCard(); $('#gArt').hidden = !isCard(); $('#gPeriod').hidden = !isCard();
-    $('#gSize').hidden = isTbl(); $('#gStyle').hidden = o.tpl !== 'card';
+    $('#gSize').hidden = isTbl() || isCh; $('#gStyle').hidden = o.tpl !== 'card';
     btn.textContent = isCard() && o.motion ? 'Gerar e compartilhar vídeo' : 'Compartilhar / salvar imagem';
     $('#snote').textContent = isCard() && o.motion ? `O vídeo é gravado em tempo real (${MOTION_SECS}s) no formato ${(videoMime()||'').includes('mp4') ? 'MP4' : 'WebM'}.`
-      : isTbl() ? 'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.' : o.tpl === 'premios' ? 'As cores vêm da foto do artista.' : '';
+      : isTbl() ? 'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.' : o.tpl === 'premios' ? 'As cores vêm da foto do artista.' : isCh ? 'A imagem mostra até 40 países (os da busca, se houver). As cores vêm da capa.' : '';
   };
   const stopLoop = () => { cancelAnimationFrame(loop); loop = 0; };
   const play = () => { stopLoop(); const t0 = performance.now();
@@ -2175,7 +2296,7 @@ Screens.share = async function({src}, alive){
   const bind = (sel, key, persist, reprep, parse = v => v) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled || recording) return; o[key] = parse(b.dataset.v); if (persist) store.set(persist, o[key]);
     $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); show(); redraw(reprep); });
   bind('#osize', 'size', 'shareSize', true); bind('#ostyle', 'style', 'shareStyle', true); bind('#oart', 'art', 'shareArt'); bind('#operiod', 'period');
-  bind('#omotion', 'motion', 'shareMotion', false, v => v === '1'); bind('#otpl', 'tpl', isAw ? null : 'shareTpl', true);
+  bind('#omotion', 'motion', 'shareMotion', false, v => v === '1'); bind('#otpl', 'tpl', isAw || isCh ? null : 'shareTpl', true);
   $('#oalb').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const id = b.dataset.v;
     picked = picked.includes(id) ? picked.filter(x => x !== id) : [...picked, id];
     $('#oalb').querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', picked.includes(x.dataset.v))); redraw(true); };

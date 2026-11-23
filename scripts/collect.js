@@ -33,6 +33,9 @@ const T = require('../lib/tracker');
   // 2b) chart Latin do iTunes por país (LivePopBars), no máximo 1x por hora
   try { await require('../lib/lpb').collectLatin(tracked, log); } catch (e) { log('LivePopBars falhou:', e.message); }
 
+  // 2c) streams do dia por país (chart diário do Spotify), 1x por dia
+  try { await T.countryStreams(); } catch (e) { log('streams por país falharam:', e.message); }
+
   // 3) arquivos publicados
   const summary = [];
   for (const a of tracked) { const s = await T.buildArtist(a.id); if (s) summary.push({ ...s, error: a.error || null }); }
