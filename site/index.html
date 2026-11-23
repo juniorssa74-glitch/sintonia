@@ -1553,7 +1553,7 @@ Screens.share = function({src}, alive){
 /* =================== PRÊMIOS (AWARDS) =================== */
 // Fonte: Wikipédia em inglês ("List of awards and nominations received by …"), coletada pelo GitHub Actions.
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const AW_TYPE = {artist:'Artista', album:'Álbum', song:'Música', other:'Outros'};
+const AW_TYPE = {artist:'Artista', album:'Álbum', song:'Música', cert:'Certificação', honor:'Reconhecimento', other:'Outros'};
 const AW_GROUP = {year:'Ano', award:'Prêmio', work:'Obra'};
 const TROPHY = '<svg class="ln" viewBox="0 0 24 24" style="width:14px;height:14px;stroke-width:2.2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
 function awMono(name){
@@ -1592,15 +1592,11 @@ Screens.awards = async function(_, alive){
     shell();
     try { d = await dataJSON(`awards/${aid}.json`); } catch { d = null; }
     if (!alive()) return;
-    if (!d || !(d.rows.length || d.extra?.length)) { $('#awBody').innerHTML = `<p class="empty">Ainda não encontramos a lista de prêmios deste artista na Wikipédia.<br>Ela é buscada a cada coleta; artistas novos aparecem em até 1 hora.</p>`; return; }
+    if (!d || !d.rows.length) { $('#awBody').innerHTML = `<p class="empty">Ainda não encontramos a lista de prêmios deste artista na Wikipédia.<br>Ela é buscada a cada coleta; artistas novos aparecem em até 1 hora.</p>`; return; }
     paint();
   };
   const paint = () => {
-    if (!d.rows.length && st.src === 'wiki' && d.extra?.length) st.src = d.extra[0].id;
-    const ex = d.extra?.find(x => x.id === st.src) || null;
-    const rows = ex ? ex.items.map(i => ({ a: i.a, y: i.y, n: '', t: i.k, c: i.c, r: 'won', img: i.img, link: i.link })) : d.rows;
-    const TYPES = ex ? EX_TYPE : AW_TYPE, GROUPS = ex ? {year:'Ano', award:'Prêmio', work:'Tipo'} : AW_GROUP;
-    if (ex) st.res = 'all';
+    const ex = null, rows = d.rows, TYPES = AW_TYPE, GROUPS = AW_GROUP;
     const awardsN = new Set(rows.map(r => r.a)).size;
     const tc = {}; rows.forEach(r => tc[r.t] = (tc[r.t] || 0) + 1);
     const q = norm(st.q);
@@ -1625,9 +1621,9 @@ Screens.awards = async function(_, alive){
       shown += items.length;
       const sub = r => ex
         ? [st.group === 'award' ? '' : (r.c ? r.a : ''), st.group === 'year' ? '' : r.y].filter(Boolean)
-        : [st.group === 'award' ? '' : r.a, st.group === 'year' ? '' : r.y, st.group === 'work' ? '' : (r.t === 'artist' ? '' : r.n)].filter(Boolean);
+        : [st.group === 'award' || r.a === r.c ? '' : r.a, st.group === 'year' ? '' : r.y, st.group === 'work' ? '' : (r.t === 'artist' ? '' : r.n)].filter(Boolean);
       const badge = r => ex ? `<span class="awres ${r.t === 'award' ? 'won' : ''}">${r.t === 'award' ? TROPHY : ''}${EX_TYPE[r.t]}</span>`
-        : r.r === 'won' ? `<span class="awres won">${TROPHY}Venceu</span>` : `<span class="awres">${r.r === 'nominated' ? 'Indicação' : esc(r.rt || 'Outro')}</span>`;
+        : r.t === 'cert' || r.t === 'honor' ? `<span class="awres won">${TROPHY}${AW_TYPE[r.t]}</span>` : r.r === 'won' ? `<span class="awres won">${TROPHY}Venceu</span>` : `<span class="awres">${r.r === 'nominated' ? 'Indicação' : esc(r.rt || 'Outro')}</span>`;
       return `<section class="awg">${head}<div class="awlist">${items.map(r => `
         <${r.link ? `a href="${esc(r.link)}" target="_blank" rel="noopener"` : 'div'} class="awrow">
           ${st.group === 'award' && !ex ? '' : awImg(d, r.a, r)}
@@ -1637,16 +1633,16 @@ Screens.awards = async function(_, alive){
     }).join('');
     const exN = k => rows.filter(r => r.t === k).length;
     $('#awBody').innerHTML = `
-      ${d.extra?.length ? `<div class="chips" id="awS" style="margin-bottom:12px"><span class="note" style="font-weight:700;align-self:center">Fonte</span>${d.rows.length ? `<button class="chip ${st.src==='wiki'?'on':''}" data-v="wiki">Wikipédia · ${d.rows.length}</button>` : ''}${d.extra.map(x => `<button class="chip ${st.src===x.id?'on':''}" data-v="${esc(x.id)}">${esc(x.name)} · ${x.items.length}</button>`).join('')}</div>` : ''}
       ${ex ? `<div class="awsum">
         <div class="kpi"><span>Prêmios</span><b style="color:var(--accent)">${nf.format(exN('award'))}</b></div>
         <div class="kpi"><span>Certificações</span><b>${nf.format(exN('cert'))}</b></div>
         <div class="kpi"><span>Reconhec.</span><b>${nf.format(exN('honor'))}</b></div>
       </div>` : `<div class="awsum">
         <div class="kpi"><span>Vitórias</span><b style="color:var(--accent)">${nf.format(d.won)}</b></div>
-        <div class="kpi"><span>Indicações</span><b>${nf.format(d.total)}</b></div>
+        <div class="kpi"><span>No total</span><b>${nf.format(d.total)}</b></div>
         <div class="kpi"><span>Premiações</span><b>${nf.format(awardsN)}</b></div>
       </div>
+      <p class="note" style="margin:-6px 0 14px">${nf.format(d.total - d.won)} indicações sem vitória${tc.cert ? ` · inclui ${tc.cert} certificações (discos de ouro/platina)` : ''}${tc.honor ? ` e ${tc.honor} reconhecimentos` : ''}</p>
       <div class="seg" id="awR" role="tablist" aria-label="Resultado">${[['all','Todos'],['won','Vitórias'],['nom','Só indicações']].map(([k,l]) => `<button role="tab" data-v="${k}" class="${st.res===k?'on':''}">${l}</button>`).join('')}</div>`}
       <div style="display:flex;align-items:center;gap:8px;margin:${ex ? '0' : '-4px'} 0 12px"><span class="note" style="font-weight:700">Agrupar por</span>
         <div class="chips" id="awG">${Object.entries(GROUPS).map(([k,l]) => `<button class="chip ${st.group===k?'on':''}" data-v="${k}">${l}</button>`).join('')}</div></div>
@@ -1654,9 +1650,7 @@ Screens.awards = async function(_, alive){
       <input class="filter" id="awQ" placeholder="Buscar prêmio, categoria, música, ano…" value="${esc(st.q)}" aria-label="Buscar nos prêmios">
       <div id="awL">${html || '<p class="empty">Nada encontrado com esses filtros.</p>'}</div>
       ${f.length > st.limit ? `<button class="btn ghost" id="awMore" style="width:100%;height:44px;border-radius:14px;margin-top:8px">Mostrar mais (${f.length - st.limit})</button>` : ''}
-      <p class="note" style="margin-top:18px;line-height:1.6">${ex
-        ? `Fonte: <a href="${esc(ex.url)}" target="_blank" rel="noopener">${esc(ex.name)}</a>, acervo com fotos dos prêmios, discos e reconhecimentos. Toque num item para ver a página com as fotos. Atualizado em ${new Date(ex.fetchedAt).toLocaleDateString('pt-BR')}.`
-        : `Fonte: Wikipédia, <a href="${esc(d.source?.url || '#')}" target="_blank" rel="noopener">${esc(d.source?.title || '')}</a> (texto sob CC BY-SA). Categorias como aparecem na página, em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString('pt-BR')}; a lista é conferida a cada 3 dias.`}</p>`;
+      <p class="note" style="margin-top:18px;line-height:1.6">Prêmios reunidos de ${(d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>${x.license ? ` (${x.license})` : ''}`).join(' e ')}. O mesmo prêmio em mais de um lugar conta uma vez só. Categorias da Wikipédia em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString('pt-BR')}.</p>`;
     const seg = (sel, k, persist) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; st[k] = b.dataset.v; if (persist) store.set(persist, st[k]); st.limit = 120; if (k === 'src') st.type = 'all'; paint(); });
     seg('#awR', 'res'); seg('#awG', 'group', 'awGroup'); seg('#awT', 'type'); seg('#awS', 'src');
     const qi = $('#awQ'); let t;
