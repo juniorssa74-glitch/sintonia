@@ -205,6 +205,12 @@ a.pill{color:var(--text);text-decoration:none}
 .trow .c b{display:block;font-size:13px}
 .trow.thead{font-size:11px;color:var(--muted);font-weight:700;padding:4px 0}
 .trow.tfoot{border-bottom:0;font-size:12px;color:var(--muted)}
+.chb{display:inline-block;font-size:10px;font-weight:800;color:#0d0f0e;background:var(--accent);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:1px}
+.crow{display:grid;grid-template-columns:26px 1fr 54px 52px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.crow .fl{font-size:18px;line-height:1}
+.crow .pos{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.crow .d{text-align:right;font-size:11px;font-weight:700}
+.crow .d.up{color:var(--accent)} .crow .d.down{color:#ff6b6b} .crow .d.ne{color:#f5c542} .crow .d.eq{color:var(--muted)}
 .preview{background:var(--card);border-radius:12px;padding:12px;display:flex;justify-content:center}
 .preview canvas{max-width:100%;max-height:58vh;width:auto;height:auto;border-radius:6px;box-shadow:0 8px 24px #0008}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -822,7 +828,7 @@ function issueLink(action, id, name){
   window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, '_blank');
   toast('Envie a issue no GitHub para confirmar');
 }
-function nextRun(){ const n = new Date(); const h = n.getUTCHours(); const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), h - h % 3 + 3, 15)); return d; }
+function nextRun(){ const n = new Date(); const h = n.getUTCHours(); const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), n.getUTCMinutes() < 45 ? h : h + 1, 45)); return d; }
 let INDEX = null;
 async function searchIndex(q){
   INDEX ??= await dataJSON('artist-index.json').catch(() => []);
@@ -904,7 +910,7 @@ function itemList(items, kind, artistId, limit){
     <button class="irow" data-go="${it.id}">
       <span class="num">${i+1}</span>
       <img src="${pic(it.img)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
-      <div class="t"><b>${it.flag==='*'?'<span class="note">feat. · </span>':''}${esc(it.name)}</b><i>Total ${fmtN(it.stats.total)}</i></div>
+      <div class="t"><b>${it.flag==='*'?'<span class="note">feat. · </span>':''}${esc(it.name)}${it.ch?`<span class="chb" title="Em ${it.ch} charts agora">${it.ch} charts</span>`:''}</b><i>Total ${fmtN(it.stats.total)}</i></div>
       <div class="v"><b>${fmtN(it.stats[p].value)}</b>${chg(it.stats[p].change) || `<i>${P[p].short.toLowerCase()}</i>`}</div>
     </button>`).join('');
 }
@@ -1024,8 +1030,10 @@ Object.assign(Screens, {
         ${periodSeg()}
         ${kpis(d.stats)}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
+        ${chartsBlock(d, isAlbum)}
         ${isAlbum ? tracksBlock(d) : ''}`;
       bindSeg(paint);
+      bindCharts(d);
       $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
       if ($('#tracks')) $('#tracks').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({type:'streamItem', artistId, kind:'songs', id:b.dataset.song}); };
       view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
@@ -1040,6 +1048,40 @@ Object.assign(Screens, {
     paint();
   },
 });
+
+/* ---------- charts atuais (Spotify, Apple Music, iTunes) ---------- */
+const SVC_LABEL = {spotify:'Spotify', apple:'Apple Music', itunes:'iTunes'};
+const regionName = (() => { let dn; try { dn = new Intl.DisplayNames(['pt-BR'], {type:'region'}); } catch {} return (cc, fb) => { if (cc === 'global' || cc === 'ww') return 'Global'; try { return (cc.length === 2 && dn?.of(cc.toUpperCase())) || fb; } catch { return fb; } }; })();
+const flagOf = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))) : '🌐';
+function kworbTime(s){ // "2026-11-23 07:35 EST" -> Date
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) (EST|EDT)$/.exec(s || ''); return m ? new Date(`${m[1]}T${m[2]}:00${m[3]==='EDT'?'-04:00':'-05:00'}`) : null;
+}
+let chartSvc = null, chartAll = false;
+function chartsBlock(d, isAlbum){
+  const c = d.charts;
+  return c ? `<div id="chartsBox">${chartsInner(c, isAlbum)}</div>` : '';
+}
+function chartsInner(c, isAlbum){
+  const svcs = Object.keys(SVC_LABEL).filter(k => c.list[k]?.length);
+  const when = kworbTime(c.updated) || (c.fetchedAt && new Date(c.fetchedAt));
+  const head = `<h2>Charts agora <small>${when ? 'atualizado ' + when.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : ''}</small></h2>`;
+  if (!svcs.length) return head + `<p class="note">${isAlbum ? 'Este álbum' : 'Esta música'} não está em nenhum chart do Spotify, Apple Music ou iTunes agora.</p>`;
+  if (!svcs.includes(chartSvc)) chartSvc = svcs[0];
+  const rows = c.list[chartSvc], shown = chartAll ? rows : rows.slice(0, 15);
+  const delta = v => !v ? '<span class="d eq">—</span>' : v === 'NE' ? '<span class="d ne">novo</span>' : v === '=' ? '<span class="d eq">=</span>' : v.startsWith('+') ? `<span class="d up">▲ ${v.slice(1)}</span>` : v.startsWith('-') ? `<span class="d down">▼ ${v.slice(1)}</span>` : `<span class="d eq">${esc(v)}</span>`;
+  return head + `
+    <div class="chips" id="csvc" style="margin-bottom:6px">${svcs.map(k => `<button class="chip ${k===chartSvc?'on':''}" data-svc="${k}">${SVC_LABEL[k]} · ${c.list[k].length}</button>`).join('')}</div>
+    <div class="crow thead" style="font-size:11px;color:var(--muted);font-weight:700"><span></span><span>País</span><span class="pos" style="font-weight:700">Posição</span><span class="d">24h</span></div>
+    ${shown.map(([cc, name, pos, ch]) => `<div class="crow"><span class="fl">${flagOf(cc)}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${delta(ch)}</div>`).join('')}
+    ${rows.length > shown.length ? `<button class="pill" id="call" style="margin-top:10px">Ver todos os ${rows.length} países</button>` : ''}
+    <p class="note" style="margin-top:6px">${isAlbum ? 'Charts de álbuns' : 'Charts de músicas'} por país (Spotify: ${isAlbum ? 'semanal' : 'diário'}; Apple Music e iTunes: atualizados ao longo do dia). Fonte: kworb.net, coletado de hora em hora.</p>`;
+}
+function bindCharts(d){
+  const box = $('#csvc'); if (!box) return;
+  const repaint = () => { $('#chartsBox').innerHTML = chartsInner(d.charts, d.kind === 'albums'); bindCharts(d); };
+  box.onclick = e => { const b = e.target.closest('[data-svc]'); if (!b) return; chartSvc = b.dataset.svc; chartAll = false; repaint(); };
+  if ($('#call')) $('#call').onclick = () => { chartAll = true; repaint(); };
+}
 
 /* ---------- faixas do álbum ---------- */
 function tracksBlock(d){
@@ -1073,7 +1115,17 @@ const STYLES = {
   claro:  {label:'Claro', bg:'#f4f1ea', text:'#141614', muted:'#5f665f', accent:'#1d8a42', card:'#e8e3d8'},
   neon:   {label:'Neon', bg:'#12061f', text:'#ffffff', muted:'#c9b8e6', accent:'#ff3dbb', card:'rgba(255,255,255,.08)', grad:['#2a0b4d','#05141c']},
 };
+// como a capa/foto aparece na arte
+const ARTS = {
+  padrao:   {label:'Padrão', sub:'capa ou foto'},
+  cd:       {label:'CD + disco', sub:'estojo e disco ao lado'},
+  disco:    {label:'Disco', sub:'CD com a arte impressa'},
+  vinil:    {label:'Vinil', sub:'capa e LP saindo'},
+  polaroid: {label:'Polaroid', sub:'foto instantânea'},
+};
 const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música'};
+const PERIOD_EN = {day:'Daily streams', week:'Weekly streams', month:'Monthly streams'};
+const MOTION_SECS = 8;
 
 function shareSource(d, kind){
   const top = kind === 'artist' ? d.songs.map(s => ({name:s.name, stats:s.stats}))
@@ -1088,52 +1140,179 @@ function rr(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(
 function coverDraw(ctx, im, x, y, w, h){ const s = Math.max(w/im.width, h/im.height), iw = im.width*s, ih = im.height*s; ctx.drawImage(im, x+(w-iw)/2, y+(h-ih)/2, iw, ih); }
 function fitFont(ctx, text, weight, size, maxW, min=20){ let s = size; do { ctx.font = `${weight} ${s}px "Plus Jakarta Sans", sans-serif`; if (ctx.measureText(text).width <= maxW) break; s -= 2; } while (s > min); return s; }
 function clip(ctx, text, maxW){ if (ctx.measureText(text).width <= maxW) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; }
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const easeOut = p => 1 - Math.pow(1 - p, 3);
 
-async function drawShare(canvas, src, o){
+/* ---------- mockups: estojo de CD, disco, vinil, polaroid ---------- */
+function imgSquare(ctx, im, x, y, s, fallback){ if (im) coverDraw(ctx, im, x, y, s, s); else { ctx.fillStyle = fallback; ctx.fillRect(x, y, s, s); } }
+function drawCD(ctx, cx, cy, r, im, angle, full, u){
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#c9ced3'; ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true); ctx.clip('evenodd');
+  // base prateada
+  const g = ctx.createRadialGradient(cx, cy, r*0.1, cx, cy, r); g.addColorStop(0, '#eef1f4'); g.addColorStop(1, '#aeb4ba');
+  ctx.fillStyle = g; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
+  // arte impressa (gira)
+  const inner = full ? r*0.34 : r*0.36, outer = full ? r*0.985 : r*0.97;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, outer, 0, 7); ctx.arc(cx, cy, inner, 0, 7, true); ctx.clip('evenodd');
+  ctx.translate(cx, cy); ctx.rotate(angle); imgSquare(ctx, im, -outer, -outer, 2*outer, '#333'); ctx.restore();
+  // anel transparente do miolo
+  ctx.beginPath(); ctx.arc(cx, cy, inner, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true);
+  ctx.fillStyle = 'rgba(225,232,238,.55)'; ctx.fill('evenodd');
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.2, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2*u; ctx.stroke();
+  // brilho iridescente (fixo, a luz não gira)
+  if (ctx.createConicGradient){
+    const s = ctx.createConicGradient(-0.6, cx, cy);
+    [[0,'rgba(255,255,255,0)'],[.08,'rgba(255,255,255,.32)'],[.13,'rgba(120,220,255,.18)'],[.2,'rgba(255,255,255,0)'],
+     [.5,'rgba(255,255,255,0)'],[.58,'rgba(255,255,255,.28)'],[.63,'rgba(255,170,240,.16)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
+    ctx.fillStyle = s; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, r - u, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2*u; ctx.stroke();
+}
+function drawVinyl(ctx, cx, cy, r, im, angle, u){
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#0b0b0b'; ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+  ctx.lineWidth = 1.2*u;
+  for (let rad = r*0.4; rad < r*0.97; rad += r*0.022){ ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${rad % (r*0.088) < r*0.022 ? .09 : .045})`; ctx.stroke(); }
+  if (ctx.createConicGradient){
+    const s = ctx.createConicGradient(-0.9, cx, cy);
+    [[0,'rgba(255,255,255,0)'],[.1,'rgba(255,255,255,.16)'],[.2,'rgba(255,255,255,0)'],[.5,'rgba(255,255,255,0)'],[.6,'rgba(255,255,255,.12)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
+    ctx.fillStyle = s; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
+  }
+  // selo central com a arte (gira)
+  const lr = r*0.36;
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.clip(); ctx.translate(cx, cy); ctx.rotate(angle); imgSquare(ctx, im, -lr, -lr, 2*lr, '#3ddc6f'); ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.03, 0, 7); ctx.fillStyle = '#0b0b0b'; ctx.fill();
+  ctx.restore();
+}
+function drawCase(ctx, x, y, c, im, u){
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
+  rr(ctx, x, y, c, c, 10*u); ctx.fillStyle = '#1a1a1a'; ctx.fill(); ctx.restore();
+  ctx.save(); rr(ctx, x, y, c, c, 10*u); ctx.clip();
+  const sp = c*0.075; // lombada
+  imgSquare(ctx, im, x + sp, y, c - sp, '#333');
+  const g = ctx.createLinearGradient(x, 0, x + sp, 0); g.addColorStop(0, '#0e0e0e'); g.addColorStop(.6, '#2b2b2b'); g.addColorStop(1, '#111');
+  ctx.fillStyle = g; ctx.fillRect(x, y, sp, c);
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = u;
+  for (let yy = y + 14*u; yy < y + c; yy += 12*u){ ctx.beginPath(); ctx.moveTo(x + sp*0.25, yy); ctx.lineTo(x + sp*0.75, yy); ctx.stroke(); }
+  // brilho do acrílico
+  const gl = ctx.createLinearGradient(x, y, x + c, y + c);
+  gl.addColorStop(0, 'rgba(255,255,255,.28)'); gl.addColorStop(.35, 'rgba(255,255,255,.06)'); gl.addColorStop(.36, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(255,255,255,.08)');
+  ctx.fillStyle = gl; ctx.fillRect(x, y, c, c);
+  ctx.restore();
+  rr(ctx, x + u, y + u, c - 2*u, c - 2*u, 10*u); ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2*u; ctx.stroke();
+}
+function drawSleeve(ctx, x, y, c, im, u){
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
+  ctx.fillStyle = '#222'; ctx.fillRect(x, y, c, c); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, c, c); ctx.clip(); imgSquare(ctx, im, x, y, c, '#333');
+  const gl = ctx.createLinearGradient(x, y, x + c, y + c); gl.addColorStop(0, 'rgba(255,255,255,.12)'); gl.addColorStop(.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.18)');
+  ctx.fillStyle = gl; ctx.fillRect(x, y, c, c); ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2*u; ctx.strokeRect(x + u, y + u, c - 2*u, c - 2*u);
+}
+// desenha a arte escolhida dentro do quadrado (x, y, s); a = progresso de entrada, spin = ângulo do disco
+function drawArt(ctx, mode, im, x, y, s, round, st, a, spin, u){
+  if (mode === 'cd' || mode === 'vinil'){
+    const c = s*0.7, d = mode === 'cd' ? c*0.94 : c*0.97, cyy = y + s/2, slide = easeOut(clamp01((a - 0.35) / 0.65));
+    const caseX = x, discX = caseX + c*0.5 + (x + s - d/2 - (caseX + c*0.5)) * slide;
+    if (mode === 'cd') drawCD(ctx, discX, cyy, d/2, im, spin, false, u); else drawVinyl(ctx, discX, cyy, d/2, im, spin, u);
+    if (mode === 'cd') drawCase(ctx, caseX, cyy - c/2, c, im, u); else drawSleeve(ctx, caseX, cyy - c/2, c, im, u);
+  } else if (mode === 'disco'){
+    drawCD(ctx, x + s/2, y + s/2, s/2, im, spin, true, u);
+  } else if (mode === 'polaroid'){
+    const w = s*0.84, h = w*1.18, ang = -0.06;
+    ctx.save(); ctx.translate(x + s/2, y + s/2); ctx.rotate(ang);
+    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 44*u; ctx.shadowOffsetY = 18*u;
+    ctx.fillStyle = '#fbfaf6'; ctx.fillRect(-w/2, -h/2, w, h); ctx.shadowColor = 'transparent';
+    const p = w*0.06, iw = w - 2*p;
+    ctx.save(); ctx.beginPath(); ctx.rect(-w/2 + p, -h/2 + p, iw, iw); ctx.clip(); imgSquare(ctx, im, -w/2 + p, -h/2 + p, iw, '#333'); ctx.restore();
+    ctx.restore();
+  } else {
+    const rad = round ? s/2 : 18*u;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
+    rr(ctx, x, y, s, s, rad); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
+    if (im){ ctx.save(); rr(ctx, x, y, s, s, rad); ctx.clip(); coverDraw(ctx, im, x, y, s, s); ctx.restore(); }
+  }
+}
+
+/* ---------- arte: preparo (imagens, fundo) + desenho de um quadro ---------- */
+async function prepareShare(src, o){
   const Z = SIZES[o.size], st = STYLES[o.style], W = Z.w, H = Z.h, u = W/1080;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
   await document.fonts.load('800 60px "Plus Jakarta Sans"').catch(()=>{});
   const im = await loadImg(src.img);
-  // fundo
-  if (st.grad){ const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, st.grad[0]); g.addColorStop(1, st.grad[1]); ctx.fillStyle = g; } else ctx.fillStyle = st.bg;
-  ctx.fillRect(0, 0, W, H);
-  if (st.blur && im){ ctx.save(); ctx.filter = `blur(${Math.round(40*u)}px) brightness(.55)`; coverDraw(ctx, im, -60*u, -60*u, W+120*u, H+120*u); ctx.restore(); }
-  if (o.style === 'escuro'){ const g = ctx.createRadialGradient(W*.5, 0, 0, W*.5, 0, H*.8); g.addColorStop(0, 'rgba(61,220,111,.22)'); g.addColorStop(1, 'rgba(61,220,111,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+  // fundo pré-renderizado (o desfoque é caro demais para refazer a cada quadro do vídeo)
+  const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
+  const b = bg.getContext('2d');
+  if (st.grad){ const g = b.createLinearGradient(0, 0, W, H); g.addColorStop(0, st.grad[0]); g.addColorStop(1, st.grad[1]); b.fillStyle = g; } else b.fillStyle = st.bg;
+  b.fillRect(0, 0, W, H);
+  if (st.blur && im){ b.save(); b.filter = `blur(${Math.round(40*u)}px) brightness(.55)`; coverDraw(b, im, -60*u, -60*u, W+120*u, H+120*u); b.restore(); }
+  return { W, H, u, st, im, bg };
+}
 
-  const P = o.period, stt = src.stats[P], vertical = H/W >= 0.95; // só o formato paisagem fica lado a lado
-  const label = {day:'streams no dia', week:'streams em 7 dias', month:'streams em 30 dias'}[P];
-  const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'}) : '';
-  const M = 72*u; // margem
-  ctx.textBaseline = 'alphabetic';
+// t = segundos desde o início da animação; null = arte estática (tudo no lugar)
+function drawFrame(canvas, src, o, R, t){
+  const { W, H, u, st, im, bg } = R;
+  if (canvas.width !== W || canvas.height !== H){ canvas.width = W; canvas.height = H; }
+  const ctx = canvas.getContext('2d');
+  const still = t == null;
+  const A = (start, dur = 0.7) => still ? 1 : easeOut(clamp01((t - start) / dur));
+  const fadeIn = (a, dy = 30*u) => { ctx.globalAlpha = a; return (1 - a) * dy; };
+  ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic';
+  ctx.drawImage(bg, 0, 0);
+  // luz de fundo (pulsa no vídeo)
+  const pulse = still ? 1 : 0.75 + 0.25*Math.sin(t*1.6);
+  if (o.style === 'escuro' || o.style === 'neon'){
+    const rgb = o.style === 'neon' ? '255,61,187' : '61,220,111';
+    const g = ctx.createRadialGradient(W*.5, 0, 0, W*.5, 0, H*.8); g.addColorStop(0, `rgba(${rgb},${.22*pulse})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
 
-  // capa
+  const P = o.period, stt = src.stats[P], vertical = H/W >= 0.95;
+  const M = 72*u;
+  const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
+  const wideArt = o.art === 'cd' || o.art === 'vinil';
+
+  // posição da arte
   let cx, cy, cs, tx, ty, tw;
-  if (vertical){ cs = Math.min(W - 2*M - 140*u, H*(H/W > 1.5 ? 0.36 : H/W > 1.1 ? 0.33 : 0.3)); cx = (W-cs)/2; cy = M + 70*u; tx = M; tw = W - 2*M; ty = cy + cs + 90*u; }
-  else { cs = Math.min(H - 2*M - 80*u, W*0.4); cx = M; cy = (H-cs)/2 - 20*u; tx = cx + cs + 64*u; tw = W - tx - M; ty = cy + 40*u; }
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 50*u; ctx.shadowOffsetY = 20*u;
-  rr(ctx, cx, cy, cs, cs, src.kind === 'artist' ? cs/2 : 18*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
-  if (im){ ctx.save(); rr(ctx, cx, cy, cs, cs, src.kind === 'artist' ? cs/2 : 18*u); ctx.clip(); coverDraw(ctx, im, cx, cy, cs, cs); ctx.restore(); }
+  if (vertical){
+    cs = Math.min(W - 2*M - (wideArt ? 0 : 140*u), H*(H/W > 1.5 ? 0.36 : H/W > 1.1 ? 0.33 : 0.3) * (wideArt ? 1.25 : 1));
+    cx = (W-cs)/2; cy = M + 30*u; tx = M; tw = W - 2*M; ty = cy + cs + 90*u;
+  } else { cs = Math.min(H - 2*M - 80*u, W*0.4); cx = M; cy = (H-cs)/2 - 20*u; tx = cx + cs + 64*u; tw = W - tx - M; ty = cy + 40*u; }
+  const aArt = A(0, 1.1), spin = still ? 0.5 : t * 1.4;
+  ctx.save();
+  if (!still){ const sc = 0.88 + 0.12*easeOut(clamp01(t/0.9)); ctx.globalAlpha = clamp01(t/0.5); ctx.translate(cx + cs/2, cy + cs/2); ctx.scale(sc, sc); ctx.translate(-(cx + cs/2), -(cy + cs/2)); }
+  drawArt(ctx, o.art, im, cx, cy, cs, src.kind === 'artist', st, aArt, spin, u);
+  ctx.restore(); ctx.globalAlpha = 1;
 
   const align = vertical ? 'center' : 'left', ax = vertical ? W/2 : tx;
   ctx.textAlign = align;
-  // tipo
-  ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
-  ctx.fillText((KIND_LABEL[src.kind] + ' · Spotify').toUpperCase(), ax, ty); ty += 70*u;
-  // título
-  ctx.fillStyle = st.text; fitFont(ctx, src.title, 800, 76*u, tw, 34*u); ctx.fillText(clip(ctx, src.title, tw), ax, ty); ty += 52*u;
-  if (src.artist){ ctx.fillStyle = st.muted; fitFont(ctx, src.artist, 600, 38*u, tw, 24*u); ctx.fillText(clip(ctx, src.artist, tw), ax, ty); ty += 30*u; }
+  let dy;
+  dy = fadeIn(A(0.5)); ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText((KIND_LABEL[src.kind] + ' · Spotify').toUpperCase(), ax, ty + dy); ty += 70*u;
+  dy = fadeIn(A(0.65)); ctx.fillStyle = st.text; fitFont(ctx, src.title, 800, 76*u, tw, 34*u); ctx.fillText(clip(ctx, src.title, tw), ax, ty + dy); ty += 52*u;
+  if (src.artist){ dy = fadeIn(A(0.8)); ctx.fillStyle = st.muted; fitFont(ctx, src.artist, 600, 38*u, tw, 24*u); ctx.fillText(clip(ctx, src.artist, tw), ax, ty + dy); ty += 30*u; }
   ty += 80*u;
-  // número principal
-  const big = nf.format(stt.value);
-  ctx.fillStyle = st.accent; fitFont(ctx, big, 800, (vertical ? 128 : 112)*u, tw, 48*u); ctx.fillText(big, ax, ty); ty += 50*u;
-  ctx.fillStyle = st.text; ctx.font = `700 ${34*u}px "Plus Jakarta Sans", sans-serif`;
-  let line2 = label;
+  // número principal (conta de 0 até o valor no vídeo)
+  const count = still ? 1 : easeOut(clamp01((t - 0.9) / 1.6));
+  const big = nf.format(Math.round(stt.value * count));
+  dy = fadeIn(A(0.9, 0.4)); ctx.fillStyle = st.accent; fitFont(ctx, nf.format(stt.value), 800, (vertical ? 128 : 112)*u, tw, 48*u); ctx.fillText(big, ax, ty + dy); ty += 50*u;
+  dy = fadeIn(A(1.3)); ctx.fillStyle = st.text; ctx.font = `700 ${34*u}px "Plus Jakarta Sans", sans-serif`;
+  let line2 = PERIOD_EN[P];
   if (stt.change != null) line2 += `  ${stt.change >= 0 ? '▲' : '▼'} ${Math.abs(stt.change*100).toLocaleString('pt-BR', {maximumFractionDigits:1})}%`;
-  ctx.fillText(line2, ax, ty); ty += 46*u;
-  ctx.fillStyle = st.muted; ctx.font = `600 ${28*u}px "Plus Jakarta Sans", sans-serif`;
-  ctx.fillText(`Total: ${nf.format(src.stats.total)} streams`, ax, ty); ty += 30*u;
-  if (!stt.complete) { ty += 12*u; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText(`período parcial · ${stt.covered} de ${stt.days} dias coletados`, ax, ty); ty += 20*u; }
+  ctx.fillText(line2, ax, ty + dy); ty += 46*u;
+  dy = fadeIn(A(1.5)); ctx.fillStyle = st.muted; ctx.font = `600 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText(`Total: ${nf.format(src.stats.total)} streams`, ax, ty + dy); ty += 30*u;
+  if (!stt.complete) { ty += 12*u; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText(`período parcial · ${stt.covered} de ${stt.days} dias coletados`, ax, ty + dy); ty += 20*u; }
+  ctx.globalAlpha = 1;
 
   // top faixas
   const footerH = 90*u, room = H - ty - footerH - 50*u, rowH = 66*u;
@@ -1142,75 +1321,129 @@ async function drawShare(canvas, src, o){
   if (top.length){
     ty += 56*u;
     const lx = vertical ? M : tx, lw = vertical ? W - 2*M : tw;
-    ctx.save(); rr(ctx, lx, ty, lw, 40*u + rowH*top.length + 26*u, 22*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
+    dy = fadeIn(A(1.8)); ctx.save(); rr(ctx, lx, ty + dy, lw, 40*u + rowH*top.length + 26*u, 22*u); ctx.fillStyle = st.card; ctx.fill(); ctx.restore();
     ty += 52*u; ctx.textAlign = 'left';
     ctx.fillStyle = st.muted; ctx.font = `800 ${22*u}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText(src.kind === 'artist' ? 'MÚSICAS EM ALTA' : 'FAIXAS EM ALTA', lx + 28*u, ty); ty += 14*u;
-    top.forEach((t, i) => {
+    ctx.fillText(src.kind === 'artist' ? 'MÚSICAS EM ALTA' : 'FAIXAS EM ALTA', lx + 28*u, ty + dy); ty += 14*u;
+    top.forEach((tr, i) => {
       ty += rowH;
+      const a = A(2 + i*0.15, 0.5), dx = (1 - a) * 40*u; ctx.globalAlpha = a;
       ctx.textAlign = 'left'; ctx.fillStyle = st.accent; ctx.font = `800 ${30*u}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillText(String(i+1), lx + 28*u, ty - 18*u);
+      ctx.fillText(String(i+1), lx + 28*u + dx, ty - 18*u);
       ctx.fillStyle = st.text; ctx.font = `700 ${30*u}px "Plus Jakarta Sans", sans-serif`;
-      const v = fmtN(t.stats[P].value); ctx.textAlign = 'right';
-      ctx.fillText(v, lx + lw - 28*u, ty - 18*u); const vw = ctx.measureText(v).width;
-      ctx.textAlign = 'left'; ctx.fillText(clip(ctx, t.name, lw - 120*u - vw), lx + 76*u, ty - 18*u);
+      const v = fmtN(tr.stats[P].value); ctx.textAlign = 'right';
+      ctx.fillText(v, lx + lw - 28*u + dx, ty - 18*u); const vw = ctx.measureText(v).width;
+      ctx.textAlign = 'left'; ctx.fillText(clip(ctx, tr.name, lw - 120*u - vw), lx + 76*u + dx, ty - 18*u);
     });
+    ctx.globalAlpha = 1;
   }
-  // rodapé
-  const foot = `Dados de ${date} · fonte: kworb.net`;
-  if (vertical){
-    ctx.textAlign = 'center'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText(clip(ctx, foot, W - 2*M), W/2, H - M + 20*u);
-    ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`; ctx.fillText('Sintonia', W/2, M + 20*u);
-  } else {
-    ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText('Sintonia', W - M, H - M + 20*u); const sw = ctx.measureText('Sintonia').width;
-    ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${22*u}px "Plus Jakarta Sans", sans-serif`;
-    ctx.fillText(clip(ctx, foot, W - M - sw - 40*u - tx), tx, H - M + 20*u);
-  }
+  // rodapé: data no canto esquerdo, marca no direito
+  ctx.globalAlpha = A(2.4); const fy = H - M + 20*u;
+  ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText('Sintonia', W - M, fy); const sw = ctx.measureText('Sintonia').width;
+  ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillText(clip(ctx, `Atualização: ${date}`, W - 2*M - sw - 40*u), M, fy);
+  ctx.globalAlpha = 1;
 }
 
-async function exportShare(canvas, name){
-  const file = `sintonia-${name.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase().slice(0, 40)}.png`;
+/* ---------- exportar: imagem (PNG) ou vídeo (MP4/WebM) ---------- */
+const fileBase = name => 'sintonia-' + name.normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase().slice(0, 40);
+const blobB64 = blob => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(blob); });
+async function exportBlob(blob, file, title, kindLabel){
   const FS = capPlugin('Filesystem'), SH = capPlugin('Share');
   if (FS && SH){
-    const data = canvas.toDataURL('image/png').split(',')[1];
-    const w = await FS.writeFile({path: file, data, directory: 'CACHE'});
-    try { await SH.share({title: name, files: [w.uri], dialogTitle: 'Compartilhar imagem'}); }
+    const w = await FS.writeFile({path: file, data: await blobB64(blob), directory: 'CACHE'});
+    try { await SH.share({title, files: [w.uri], dialogTitle: `Compartilhar ${kindLabel}`}); }
     catch (e) { if (!/cancel/i.test(e.message || '')) throw e; }
     return;
   }
-  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-  const f = new File([blob], file, {type:'image/png'});
-  if (navigator.canShare?.({files:[f]})) { try { await navigator.share({files:[f], title:name}); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const f = new File([blob], file, {type: blob.type});
+  if (navigator.canShare?.({files:[f]})) { try { await navigator.share({files:[f], title}); return; } catch (e) { if (e.name === 'AbortError') return; } }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast('Imagem salva em Downloads');
+  toast(`${kindLabel[0].toUpperCase() + kindLabel.slice(1)} salvo em Downloads`);
+}
+function videoMime(){
+  if (!window.MediaRecorder) return null;
+  return ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    .find(m => { try { return MediaRecorder.isTypeSupported(m); } catch { return false; } }) || null;
+}
+// grava a animação em tempo real a partir do canvas (MediaRecorder)
+function recordMotion(canvas, src, o, R, onProgress){
+  return new Promise((ok, no) => {
+    const mime = videoMime(); if (!mime || !canvas.captureStream) return no(new Error('Gravação de vídeo não suportada neste aparelho'));
+    const stream = canvas.captureStream(30), chunks = [];
+    const rec = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 8e6});
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => { stream.getTracks().forEach(tr => tr.stop()); ok(new Blob(chunks, {type: mime.split(';')[0]})); };
+    rec.onerror = e => no(e.error || new Error('falha na gravação'));
+    drawFrame(canvas, src, o, R, 0);
+    rec.start(250);
+    const t0 = performance.now();
+    const tick = () => {
+      const t = (performance.now() - t0) / 1000;
+      drawFrame(canvas, src, o, R, Math.min(t, MOTION_SECS));
+      onProgress?.(t);
+      if (t < MOTION_SECS) requestAnimationFrame(tick); else setTimeout(() => rec.stop(), 120);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
-Screens.share = function({src}){
-  const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'escuro'), period: S.period, list: true };
+Screens.share = function({src}, alive){
+  const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'escuro'), art: store.get('shareArt', 'padrao'),
+              motion: store.get('shareMotion', false), period: S.period, list: true };
+  if (!ARTS[o.art]) o.art = 'padrao';
+  const canVideo = !!videoMime();
+  if (!canVideo) o.motion = false;
   view.innerHTML = `
     <button class="back" onclick="back()">${I.back}</button>
     <h1>Criar imagem</h1>
     <div class="sub" style="margin-bottom:12px">${esc(KIND_LABEL[src.kind])} · ${esc(src.title)}</div>
     <div class="preview"><canvas id="cv"></canvas></div>
-    <h2 style="margin-top:18px">Dimensão</h2>
+    <h2 style="margin-top:18px">Formato</h2>
+    <div class="seg" id="omotion"><button data-v="0" class="${o.motion?'':'on'}">Imagem (PNG)</button><button data-v="1" class="${o.motion?'on':''}" ${canVideo?'':'disabled title="Este navegador não grava vídeo"'}>Animado (vídeo ${MOTION_SECS}s)</button></div>
+    <h2>Dimensão</h2>
     <div class="opts" id="osize">${Object.entries(SIZES).map(([k,v]) => `<button data-v="${k}" class="${o.size===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>
+    <h2>Capa</h2>
+    <div class="opts" id="oart">${Object.entries(ARTS).map(([k,v]) => `<button data-v="${k}" class="${o.art===k?'on':''}"><b>${v.label}</b><i>${v.sub}</i></button>`).join('')}</div>
     <h2>Estilo</h2>
     <div class="opts" id="ostyle">${Object.entries(STYLES).map(([k,v]) => `<button data-v="${k}" class="${o.style===k?'on':''}"><span class="sw" style="background:${v.grad ? `linear-gradient(135deg,${v.grad[0]},${v.grad[1]})` : v.bg};border-color:${v.accent}"></span><b>${v.label}</b></button>`).join('')}</div>
     <h2>Período</h2>
     <div class="seg" id="operiod">${Object.entries(P).map(([k,v]) => `<button data-v="${k}" class="${o.period===k?'on':''}">${v.label}</button>`).join('')}</div>
     ${src.top.length ? `<label class="note" style="display:flex;gap:8px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="olist" checked> Mostrar ${src.kind==='artist'?'músicas':'faixas'} em alta</label>` : ''}
-    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px">Compartilhar / salvar imagem</button>`;
-  const cv = $('#cv');
-  let busy = Promise.resolve();
-  const redraw = () => { busy = busy.then(() => drawShare(cv, src, o)).then(() => { cv.style.aspectRatio = `${cv.width}/${cv.height}`; }); };
-  const bind = (sel, key, persist) => $(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; o[key] = b.dataset.v; if (persist) store.set(persist, o[key]);
-    $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); redraw(); };
-  bind('#osize', 'size', 'shareSize'); bind('#ostyle', 'style', 'shareStyle'); bind('#operiod', 'period');
+    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px"></button>
+    <p class="note" id="snote" style="margin-top:8px"></p>`;
+  const cv = $('#cv'), btn = $('#sbtn');
+  let R = null, loop = 0, recording = false, prep = Promise.resolve();
+  const label = () => { btn.textContent = o.motion ? 'Gerar e compartilhar vídeo' : 'Compartilhar / salvar imagem';
+    $('#snote').textContent = o.motion ? `O vídeo é gravado em tempo real (${MOTION_SECS}s) no formato ${(videoMime()||'').includes('mp4') ? 'MP4' : 'WebM'}.` : ''; };
+  const stopLoop = () => { cancelAnimationFrame(loop); loop = 0; };
+  const play = () => { stopLoop(); const t0 = performance.now();
+    const f = () => { if (!alive() || !cv.isConnected) return stopLoop(); if (!recording) drawFrame(cv, src, o, R, ((performance.now() - t0) / 1000) % MOTION_SECS); loop = requestAnimationFrame(f); };
+    loop = requestAnimationFrame(f); };
+  // muda tamanho/estilo => refaz o preparo; o resto só redesenha
+  const redraw = (reprep) => {
+    if (reprep || !R) prep = prepareShare(src, o).then(r => { R = r; });
+    prep.then(() => { cv.style.aspectRatio = `${R.W}/${R.H}`; if (o.motion) play(); else { stopLoop(); drawFrame(cv, src, o, R, null); } });
+  };
+  const bind = (sel, key, persist, reprep, parse = v => v) => $(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled || recording) return; o[key] = parse(b.dataset.v); if (persist) store.set(persist, o[key]);
+    $(sel).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); label(); redraw(reprep); };
+  bind('#osize', 'size', 'shareSize', true); bind('#ostyle', 'style', 'shareStyle', true); bind('#oart', 'art', 'shareArt'); bind('#operiod', 'period');
+  bind('#omotion', 'motion', 'shareMotion', false, v => v === '1');
   if ($('#olist')) $('#olist').onchange = e => { o.list = e.target.checked; redraw(); };
-  $('#sbtn').onclick = async () => { await busy; try { await exportShare(cv, src.title); } catch (e) { toast('Não foi possível compartilhar'); console.error(e); } };
-  redraw();
+  btn.onclick = async () => {
+    if (recording) return;
+    await prep;
+    try {
+      if (!o.motion){ const blob = await new Promise(r => cv.toBlob(r, 'image/png')); return await exportBlob(blob, fileBase(src.title) + '.png', src.title, 'imagem'); }
+      recording = true; stopLoop(); btn.disabled = true;
+      const blob = await recordMotion(cv, src, o, R, t => { btn.textContent = `Gravando vídeo… ${Math.min(MOTION_SECS, Math.floor(t))}/${MOTION_SECS}s`; });
+      btn.textContent = 'Preparando…';
+      await exportBlob(blob, fileBase(src.title) + (blob.type.includes('mp4') ? '.mp4' : '.webm'), src.title, 'vídeo');
+    } catch (e) { toast(e.message?.startsWith('Gravação') ? e.message : 'Não foi possível compartilhar'); console.error(e); }
+    finally { recording = false; btn.disabled = false; label(); if (o.motion) play(); }
+  };
+  label(); redraw(true);
 };
 
 /* =================== MÚSICAS DO CELULAR =================== */
