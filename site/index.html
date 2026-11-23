@@ -531,6 +531,7 @@ const ES = {
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
+  [/^Só as faixas deste álbum: as de (.+), que vêm junto no Spotify e na Apple, ficam de fora da lista e dos números.$/, 'Solo las canciones de este álbum: las de $1, que vienen incluidas en Spotify y Apple, quedan fuera de la lista y de los números.'],
   [/^(\d+) (faixa|faixas) em (\d+) (país|países) · chart diário de músicas$/, (m, a, f, b, p) => `${a} ${a === '1' ? 'canción' : 'canciones'} en ${b} ${p} · chart diario de canciones`],
   [/^(\d+) (país|países) · melhor #(\d+) em (.+)$/, '$1 $2 · mejor #$3 en $4'],
   [/^(.+) · (\d+) (faixa|faixas)$/, (m, c, n) => `${c} · ${n} ${n === '1' ? 'canción' : 'canciones'}`],
@@ -1563,6 +1564,7 @@ function tracksBlock(d){
         <span class="c">${t.stats ? `<b>${fmtN(t.stats.day.value)}</b>${chg(t.stats.day.change) || `<i>${nf.format(t.stats.day.value)}</i>`}` : '—'}</span>
       </button>`).join('')}</div>
     <div class="trow tfoot"><span class="num"></span><span class="t">Soma das faixas com dados (${withData.length})</span><span class="c"><b>${fmtN(sumT)}</b></span><span class="c"><b>${fmtN(sumD)}</b></span></div>
+    ${d.includes ? `<p class="note" style="margin-top:6px">Só as faixas deste álbum: as de ${esc(d.includes.join(", "))}, que vêm junto no Spotify e na Apple, ficam de fora da lista e dos números.</p>` : ""}
     <p class="note" style="margin-top:6px">Faixas da Apple Music cruzadas pelo nome com os streams do Spotify (kworb). Em álbuns de outros artistas, só as faixas com ${esc(d.artistName)} têm dados.</p>`;
 }
 
