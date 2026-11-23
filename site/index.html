@@ -384,11 +384,179 @@ const viaProxy = u => (u && HAS_PROXY && /^https:\/\/[^/]+\.(mzstatic\.com|spoti
 const dataJSON = p => fetch('data/' + p, {cache:'no-cache'}).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
 const big = (u, n=600) => u ? viaProxy(u.replace(/\/\d+x\d+(bb)?\.(jpg|png|webp)/, `/${n}x${n}bb.jpg`)) : '';
 const fmt = s => { if (!isFinite(s)) return '0:00'; s = Math.floor(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+let LANG = 'pt';
 const store = {
   get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+/* =================== IDIOMA (português / español) =================== */
+// As telas são escritas em português; em espanhol, os textos são trocados ao aparecer na tela
+// (e também nas imagens geradas). Nomes de músicas, álbuns e artistas não mudam.
+LANG = store.get('lang', 'pt') === 'es' ? 'es' : 'pt';
+const LOC = () => LANG === 'es' ? 'es-419' : 'pt-BR';
+const ES = {
+  // navegação e geral
+  'Streams':'Streams', 'Ouvir':'Escuchar', 'Buscar':'Buscar', 'Prêmios':'Premios', 'Biblioteca':'Biblioteca', 'Voltar':'Volver', 'Fechar':'Cerrar',
+  'Tocando de':'Reproduciendo de', 'Curtir':'Me gusta', 'Tocar/pausar':'Reproducir/pausar', 'Aleatório':'Aleatorio', 'Anterior':'Anterior', 'Próxima':'Siguiente', 'Repetir':'Repetir',
+  'Mais opções':'Más opciones', 'Filtrar':'Filtrar', 'Mostrar mais':'Mostrar más', 'Sem dados.':'Sin datos.', 'Sem dados ainda.':'Aún no hay datos.', 'carregando…':'cargando…',
+  'Idioma':'Idioma', 'Português':'Português', 'Español':'Español',
+  // Streams
+  'Streams do Spotify':'Streams de Spotify', 'Seus artistas':'Tus artistas', 'Acompanhar artista':'Seguir artista', 'Acompanhar':'Seguir', 'Acompanhar um artista':'Seguir a un artista',
+  'Nome do artista ou link do Spotify':'Nombre del artista o enlace de Spotify', 'Artista do link':'Artista del enlace',
+  'Nenhum artista encontrado. A busca cobre os ~3.000 maiores do Spotify. Para outros, cole o link do artista no Spotify.':'No se encontró ningún artista. La búsqueda cubre los ~3.000 más grandes de Spotify. Para otros, pega el enlace del artista en Spotify.',
+  'Última coleta falhou':'La última recopilación falló', 'Nenhum artista acompanhado ainda.':'Todavía no sigues a ningún artista.', 'Em alta':'En tendencia',
+  'Último dia disponível:':'Último día disponible:', 'Rodar coleta agora':'Recopilar ahora', 'Chave do GitHub':'Clave de GitHub',
+  'Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.':'Aún no hay datos publicados. La primera recopilación aparece aquí en unos minutos.',
+  'Dia':'Día', 'Semana':'Semana', 'Mês':'Mes', 'Diário':'Diario', 'Semanal':'Semanal', 'Mensal':'Mensual', 'Hoje':'Hoy', '7 dias':'7 días', '30 dias':'30 días',
+  'Streams no dia':'Streams del día', 'Streams em 7 dias':'Streams en 7 días', 'Streams em 30 dias':'Streams en 30 días', 'Total no Spotify':'Total en Spotify',
+  'no dia':'en el día', 'no período':'en el período', 'parcial':'parcial', 'desde a estreia':'desde el debut', 'no Spotify':'en Spotify',
+  'Streams por dia':'Streams por día', 'Streams por semana':'Streams por semana', 'Streams por mês':'Streams por mes', 'Ver tabela':'Ver tabla', 'Ver gráfico':'Ver gráfico',
+  'Barras claras = período ainda incompleto.':'Barras claras = período aún incompleto.', 'O gráfico ganha uma barra a cada dia coletado. Barras claras = período ainda incompleto.':'El gráfico suma una barra por cada día recopilado. Barras claras = período aún incompleto.',
+  'De onde vêm os streams (total)':'De dónde vienen los streams (total)', 'Sem dados para este artista.':'Sin datos para este artista.',
+  'Ver no kworb':'Ver en kworb', 'Ver no Chartmasters':'Ver en Chartmasters', 'Abrir no Spotify':'Abrir en Spotify', 'Deixar de acompanhar':'Dejar de seguir',
+  'Músicas':'Canciones', 'Álbuns':'Álbumes', 'Música':'Canción', 'MÚSICA':'CANCIÓN', 'ÁLBUM':'ÁLBUM', 'Álbum':'Álbum', 'Artista':'Artista', 'Ouvir prévia':'Escuchar adelanto', 'Prévia não encontrada':'Adelanto no encontrado',
+  'Charts agora':'Charts ahora', 'novo':'nuevo', 'País':'País', 'Posição':'Posición', 'Faixas':'Canciones', 'Total':'Total', 'sem dados no kworb':'sin datos en kworb',
+  'Lista de faixas não encontrada para este álbum.':'No se encontró la lista de canciones de este álbum.', 'chart semanal':'chart semanal',
+  'Esta música':'Esta canción', 'Este álbum':'Este álbum', 'Charts de álbuns':'Charts de álbumes', 'Charts de músicas':'Charts de canciones',
+  // Criar imagem
+  'Criar imagem':'Crear imagen', 'Modelo':'Modelo', 'Álbuns na tabela':'Álbumes en la tabla', 'Formato':'Formato', 'Imagem (PNG)':'Imagen (PNG)', 'Dimensão':'Tamaño', 'Capa':'Portada',
+  'Estilo':'Estilo', 'Período':'Período', "Marca d'água e foto":'Marca de agua y foto', 'Texto no canto da imagem (deixe vazio para tirar)':'Texto en la esquina de la imagen (déjalo vacío para quitarlo)',
+  'Trocar foto':'Cambiar foto', 'Voltar à foto original':'Volver a la foto original', 'Use uma foto sua no lugar da capa.':'Usa una foto tuya en lugar de la portada.',
+  'Escolha um ou mais (ex.: os dois volumes de uma era). Faixas repetidas aparecem uma vez.':'Elige uno o más (ej.: los dos volúmenes de una era). Las canciones repetidas aparecen una vez.',
+  'Escolha um ou mais álbuns abaixo':'Elige uno o más álbumes abajo', 'Cores da capa':'Colores de la portada', 'Escuro':'Oscuro', 'Capa desfocada':'Portada difuminada', 'Claro':'Claro', 'Neon':'Neón',
+  'Padrão':'Estándar', 'capa ou foto':'portada o foto', 'CD + disco':'CD + disco', 'estojo e disco ao lado':'caja y disco al lado', 'Disco':'Disco', 'CD com a arte impressa':'CD con el arte impreso',
+  'Vinil':'Vinilo', 'capa e LP girando ao lado':'portada y LP girando al lado', 'Polaroid':'Polaroid', 'foto instantânea':'foto instantánea',
+  'Cartão':'Tarjeta', 'número em destaque':'número destacado', 'Tabela de faixas':'Tabla de canciones', 'total, diário e variação':'total, diario y variación', 'resumo das conquistas':'resumen de logros',
+  'Stories':'Historias', 'Feed 4:5':'Feed 4:5', 'Quadrado':'Cuadrado', 'Paisagem':'Horizontal', 'Mostrar músicas em alta':'Mostrar canciones en tendencia', 'Mostrar faixas em alta':'Mostrar canciones en tendencia',
+  'Gerar e compartilhar vídeo':'Generar y compartir video', 'Compartilhar / salvar imagem':'Compartir / guardar imagen', 'Preparando…':'Preparando…',
+  'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.':'La altura de la imagen sigue el número de canciones. Los colores vienen de la portada del álbum.',
+  'As cores vêm da foto do artista.':'Los colores vienen de la foto del artista.', 'Não foi possível compartilhar':'No se pudo compartir', 'Este navegador não grava vídeo':'Este navegador no graba video',
+  'Gravação de vídeo não suportada neste aparelho':'Este dispositivo no permite grabar video', 'Imagem salvo em Downloads':'Imagen guardada en Descargas', 'Vídeo salvo em Downloads':'Video guardado en Descargas',
+  // imagens (canvas)
+  'SPOTIFY':'SPOTIFY', 'FAIXAS EM ALTA':'CANCIONES EN TENDENCIA', 'MÚSICAS EM ALTA':'CANCIONES EN TENDENCIA', 'VITÓRIAS':'VICTORIAS', 'INDICAÇÕES NO TOTAL':'NOMINACIONES EN TOTAL',
+  'PREMIAÇÕES DIFERENTES':'PREMIACIONES DISTINTAS', 'PREMIAÇÕES':'PREMIACIONES', 'VITÓRIAS MAIS RECENTES':'VICTORIAS MÁS RECIENTES', 'ANO DA PRIMEIRA VITÓRIA REGISTRADA':'AÑO DE LA PRIMERA VICTORIA REGISTRADA',
+  'DISCOS DE OURO E PLATINA NO ACERVO':'DISCOS DE ORO Y PLATINO EN EL ACERVO', 'CONQUISTADOS PELA ACADEMIA LATINA':'OTORGADOS POR LA ACADEMIA LATINA', 'CONQUISTADO PELA ACADEMIA LATINA':'OTORGADO POR LA ACADEMIA LATINA',
+  // Prêmios
+  'Awards':'Awards', 'Vitórias':'Victorias', 'No total':'En total', 'Premiações':'Premiaciones', 'Todos':'Todos', 'Só indicações':'Solo nominaciones', 'Agrupar por':'Agrupar por', 'Ano':'Año', 'Prêmio':'Premio', 'Obra':'Obra', 'Tipo':'Tipo',
+  'Outros':'Otros', 'Certificação':'Certificación', 'Certificações':'Certificaciones', 'Reconhecimento':'Reconocimiento', 'Reconhec.':'Reconoc.', 'Venceu':'Ganó', 'Indicação':'Nominación', 'Outro':'Otro', 'Sem ano':'Sin año',
+  'Nada encontrado com esses filtros.':'No se encontró nada con esos filtros.', 'Buscar prêmio, categoria, música, ano…':'Buscar premio, categoría, canción, año…', 'Buscar nos prêmios':'Buscar en los premios',
+  'Acompanhe um artista na aba Streams para ver os prêmios dele.':'Sigue a un artista en la pestaña Streams para ver sus premios.', 'Resultado':'Resultado',
+  // Chave do GitHub
+  'Configuração única':'Configuración única', 'Como criar (1 minuto)':'Cómo crearla (1 minuto)', 'Criar chave no GitHub':'Crear clave en GitHub', 'Cole a chave aqui':'Pega la clave aquí',
+  'Salvar':'Guardar', 'Salvar e continuar':'Guardar y continuar', 'Agora não: abrir o GitHub desta vez':'Ahora no: abrir GitHub esta vez', 'Apagar a chave deste aparelho':'Borrar la clave de este dispositivo',
+  'Conferindo…':'Verificando…', 'Chave salva neste aparelho':'Clave guardada en este dispositivo', 'Chave apagada':'Clave borrada', 'Sem conexão com o GitHub agora.':'Sin conexión con GitHub ahora.',
+  'A chave salva não funcionou (expirou ou está sem permissão). Crie outra.':'La clave guardada no funcionó (expiró o no tiene permiso). Crea otra.',
+  'Isso não parece uma chave do GitHub (começa com github_pat_).':'Eso no parece una clave de GitHub (empieza con github_pat_).', 'O GitHub recusou a chave. Confira se copiou inteira.':'GitHub rechazó la clave. Revisa que la copiaste completa.',
+  'A chave do GitHub não funcionou. Confira e salve de novo.':'La clave de GitHub no funcionó. Revísala y guárdala de nuevo.', 'Sem conexão com o GitHub. Tente de novo.':'Sin conexión con GitHub. Inténtalo de nuevo.',
+  'Disponível na versão online (GitHub)':'Disponible en la versión en línea (GitHub)', 'Envie a issue no GitHub para confirmar':'Envía la issue en GitHub para confirmar',
+  'Toque em':'Toca', '. A página abre já preenchida.':'. La página se abre ya completada.', ', escolha':', elige', 'e marque':'y marca', ', confira':', revisa', ', copie o código (começa com':', copia el código (empieza con', ') e cole abaixo.':') y pégalo abajo.',
+  // Ouvir / Buscar / Biblioteca
+  'Bom dia':'Buenos días', 'Boa tarde':'Buenas tardes', 'Boa noite':'Buenas noches', 'Tudo':'Todo', 'Podcasts':'Podcasts', 'Rádios':'Radios', 'Dados ao vivo ·':'Datos en vivo ·',
+  'Em alta no Brasil':'En tendencia en Brasil', 'Rádios bombando agora':'Radios más escuchadas ahora', 'atualiza a cada 30s':'se actualiza cada 30 s', 'Escolhido pra você':'Elegido para ti',
+  'Podcasts mais ouvidos':'Podcasts más escuchados', 'Álbuns mais tocados':'Álbumes más escuchados', 'Não foi possível carregar as paradas agora.':'No se pudieron cargar los rankings ahora.',
+  'Podcast · Episódio mais recente':'Podcast · Episodio más reciente', 'Não foi possível carregar os podcasts.':'No se pudieron cargar los podcasts.', 'Navegar por gênero':'Explorar por género',
+  'O que você quer ouvir?':'¿Qué quieres escuchar?', 'Erro na busca. Verifique sua conexão.':'Error en la búsqueda. Revisa tu conexión.', 'Sua coleção':'Tu colección', 'Curtidas':'Me gusta',
+  'Músicas do celular':'Música del celular', 'Arquivos de áudio do aparelho · sem áudios do WhatsApp':'Archivos de audio del dispositivo · sin audios de WhatsApp', 'Podcasts que você segue':'Podcasts que sigues',
+  'Siga um podcast para ver novos episódios aqui.':'Sigue un podcast para ver nuevos episodios aquí.', 'Tocados recentemente':'Escuchados recientemente', 'Nada por aqui ainda.':'Nada por aquí todavía.',
+  'Episódios':'Episodios', 'Nenhum episódio encontrado.':'No se encontraron episodios.', 'Não foi possível abrir o podcast.':'No se pudo abrir el podcast.', 'Não foi possível abrir o álbum.':'No se pudo abrir el álbum.',
+  'Falha ao carregar.':'Error al cargar.', 'Toque no ♥ de uma música, episódio ou rádio para salvar aqui.':'Toca el ♥ de una canción, episodio o radio para guardarlo aquí.', 'Ao vivo':'En vivo', 'AO VIVO':'EN VIVO',
+  'Escolher arquivos':'Elegir archivos', 'Toque abaixo para ler os áudios do aparelho':'Toca abajo para leer los audios del dispositivo', 'Ler músicas do celular':'Leer música del celular', 'Atualizar lista':'Actualizar lista',
+  'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
+  'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
+  'Gênero':'Género',
+  'Fonte: kworb.net (streams do Spotify, publicados 1x por dia).':'Fuente: kworb.net (streams de Spotify, publicados 1 vez al día).',
+  'Semanal e mensal são completos depois de 7 e 30 dias de coleta.':'Semanal y mensual quedan completos después de 7 y 30 días de recopilación.',
+  'Como principal':'Como principal', 'Participações':'Colaboraciones', 'Subindo agora':'Subiendo ahora', 'Mais ouvidas':'Más escuchadas', 'Mais votadas':'Más votadas',
+  'Serviço de rádios indisponível. Tentando de novo…':'Servicio de radios no disponible. Reintentando…',
+  'Não foi possível conectar ao serviço de rádios agora. Tentando de novo em 30s…':'No se pudo conectar al servicio de radios ahora. Reintentando en 30 s…',
+  'Seguir':'Seguir', 'Seguindo':'Siguiendo', 'Podcast':'Podcast', 'Episódio':'Episodio', 'Rádio ao vivo':'Radio en vivo', 'No celular':'En el celular',
+  'Escolha um álbum':'Elige un álbum', 'Imagem':'Imagen', 'vídeo':'video', 'imagem':'imagen', 'Forró':'Forró', 'Axé':'Axé', 'Pagode':'Pagode', 'Sertanejo':'Sertanejo', 'Eletrônica':'Electrónica',
+};
+// textos com números, datas e nomes (o trecho variável é mantido)
+const ES_RULES = [
+  [/^Dados de (.+)$/, 'Datos del $1'],
+  [/^Charts de (músicas|álbuns) por país \(Spotify: (diário|semanal); Apple Music e iTunes: atualizados ao longo do dia\)\. Fonte: kworb\.net, coletado de hora em hora\.$/, (m, k, f) => `Charts de ${k === 'músicas' ? 'canciones' : 'álbumes'} por país (Spotify: ${f === 'diário' ? 'diario' : 'semanal'}; Apple Music e iTunes: actualizados durante el día). Fuente: kworb.net, recopilado cada hora.`],
+  [/^· dados gerados (.+) · próxima verificação ~(.+)\.$/, '· datos generados $1 · próxima verificación ~$2.'],
+  [/^Faixas da Apple Music cruzadas pelo nome com os streams do Spotify \(kworb\)\. Em álbuns de outros artistas, só as faixas com (.+) têm dados\.$/, 'Canciones de Apple Music cruzadas por nombre con los streams de Spotify (kworb). En álbumes de otros artistas, solo las canciones con $1 tienen datos.'],
+  [/^Soma das faixas com dados \((\d+)\)$/, 'Suma de las canciones con datos ($1)'],
+  [/^Ranking de rádios do Brasil · (.+)$/, 'Ranking de radios de Brasil · $1'],
+  [/^(.+) ouvintes hoje$/, '$1 oyentes hoy'],
+  [/^Sigo (.+)$/, 'Sigo $1'],
+  [/^(\d+) de (\d+) dias coletados · período ainda parcial$/, '$1 de $2 días recopilados · período aún parcial'],
+  [/^parcial · (\d+) de (\d+) dias$/, 'parcial · $1 de $2 días'],
+  [/^(\d+) (dia coletado|dias coletados)$/, (m, n) => `${n} ${n === '1' ? 'día recopilado' : 'días recopilados'}`],
+  [/^(.+) · (\d+) (dia coletado|dias coletados)$/, (m, a, n) => `${a} · ${n} ${n === '1' ? 'día recopilado' : 'días recopilados'}`],
+  [/^Artista · (\d+) faixas · (\d+) (dia coletado|dias coletados)$/, (m, f, n) => `Artista · ${f} canciones · ${n} ${n === '1' ? 'día recopilado' : 'días recopilados'}`],
+  [/^Em (\d+) (chart|charts) agora$/, (m, n) => `En ${n} ${n === '1' ? 'chart' : 'charts'} ahora`],
+  [/^(\d+) charts$/, '$1 charts'],
+  [/^chart de (.+)$/, 'chart del $1'],
+  [/^atualizado (.+)$/, 'actualizado $1'],
+  [/^Ver os (\d+) países$/, 'Ver los $1 países'],
+  [/^Ordenado por streams (.+)$/, (m, p) => 'Ordenado por streams ' + ({'no dia':'del día', 'em 7 dias':'en 7 días', 'em 30 dias':'en 30 días'}[p] || p)],
+  [/^(▲|▼) (.+) vs\. anterior$/, '$1 $2 vs. anterior'],
+  [/^Filtrar (álbuns|músicas)…$/, (m, k) => k === 'álbuns' ? 'Filtrar álbumes…' : 'Filtrar canciones…'],
+  [/^Total: (.+) streams$/, 'Total: $1 streams'],
+  [/^período parcial · (\d+) de (\d+) dias coletados$/, 'período parcial · $1 de $2 días recopilados'],
+  [/^Atualização: (.+) · streams do Spotify$/, 'Actualización: $1 · streams de Spotify'],
+  [/^Atualização: (.+)$/, 'Actualización: $1'],
+  [/^Animado \(vídeo (\d+)s\)$/, 'Animado (video $1 s)'],
+  [/^Gravando vídeo… (\d+)\/(\d+)s$/, 'Grabando video… $1/$2 s'],
+  [/^O vídeo é gravado em tempo real \((\d+)s\) no formato (\w+)\.$/, 'El video se graba en tiempo real ($1 s) en formato $2.'],
+  [/^(\d+) (VITÓRIAS|VITÓRIA)$/, (m, n) => `${n} ${n === '1' ? 'VICTORIA' : 'VICTORIAS'}`],
+  [/^"(.+)" É A OBRA MAIS PREMIADA$/, '"$1" ES LA OBRA MÁS PREMIADA'],
+  [/^EM (\d{4}), O ANO MAIS PREMIADO$/, 'EN $1, EL AÑO MÁS PREMIADO'],
+  [/^(\d+) GRAMMY LATINOS?$/, (m, n) => `${n} ${n === '1' ? 'GRAMMY LATINO' : 'GRAMMYS LATINOS'}`],
+  [/^DESDE (\d{4})$/, 'DESDE $1'],
+  [/^(\d+) CERTIFICAÇÕES$/, '$1 CERTIFICACIONES'],
+  [/^(\d+) (vitórias|vitória) em (\d+) (indicações|indicação)$/, (m, a, b, c) => `${a} ${a === '1' ? 'victoria' : 'victorias'} en ${c} ${c === '1' ? 'nominación' : 'nominaciones'}`],
+  [/^(\d+) (vitórias|vitória)$/, (m, a) => `${a} ${a === '1' ? 'victoria' : 'victorias'}`],
+  [/^(\d+) (indicações|indicação)$/, (m, a) => `${a} ${a === '1' ? 'nominación' : 'nominaciones'}`],
+  [/^(\d+) (itens|item) no acervo$/, (m, a) => `${a} ${a === '1' ? 'ítem' : 'ítems'} en el acervo`],
+  [/^([\d.]+) indicações sem vitória(.*)$/, (m, a, rest) => `${a} nominaciones sin victoria` + rest.replace(' · inclui ', ' · incluye ').replace('certificações (discos de ouro/platina)', 'certificaciones (discos de oro/platino)').replace(' e ', ' y ').replace('reconhecimentos', 'reconocimientos')],
+  [/^(Tudo|Artista|Álbum|Música|Certificação|Reconhecimento|Outros) · (\d+)$/, (m, k, n) => `${ES[k] || k} · ${n}`],
+  [/^(Spotify|Apple Music|iTunes) · (\d+)$/, '$1 · $2'],
+  [/^Mostrar mais \((\d+)\)$/, 'Mostrar más ($1)'],
+  [/^Prêmios reunidos de (.+)\. O mesmo prêmio em mais de um lugar conta uma vez só\. Categorias da Wikipédia em inglês\. Atualizado em (.+)\.$/, 'Premios reunidos de $1. El mismo premio en más de un lugar cuenta una sola vez. Categorías de Wikipedia en inglés. Actualizado el $2.'],
+  [/^Adicionando (.+)… aparece em ~2 min$/, 'Agregando $1… aparece en ~2 min'],
+  [/^Removendo (.+)… some da lista em ~2 min$/, 'Quitando $1… desaparece de la lista en ~2 min'],
+  [/^GitHub respondeu (\d+)\. Tente de novo em instantes\.$/, 'GitHub respondió $1. Inténtalo de nuevo en un momento.'],
+  [/^(\d+) arquivos · áudios do WhatsApp ficam de fora$/, '$1 archivos · los audios de WhatsApp quedan fuera'],
+  [/^Playlist · (\d+) (itens|item)$/, 'Playlist · $1 $2'],
+  [/^(Álbum|Música|Artista|Prêmios) · (.+)$/, (m, k, a) => `${ES[k] || k} · ${a}`],
+];
+const ES_MONTHS = [['janeiro','enero'],['fevereiro','febrero'],['março','marzo'],['abril','abril'],['maio','mayo'],['junho','junio'],['julho','julio'],['agosto','agosto'],['setembro','septiembre'],['outubro','octubre'],['novembro','noviembre'],['dezembro','diciembre']];
+function tr(s){
+  if (LANG !== 'es' || s == null) return s;
+  const str = String(s), t = str.trim();
+  if (!t) return s;
+  let r = ES[t];
+  if (r == null) for (const [re, rep] of ES_RULES) { if (re.test(t)) { r = t.replace(re, rep); break; } }
+  if (r == null) return s;
+  for (const [a, b] of ES_MONTHS) r = r.replace(new RegExp(`\\b${a}\\b`, 'g'), b);
+  return str.replace(t, r);
+}
+// traduz o que aparece na tela (texto e atributos), sem tocar em campos que o usuário digita
+const TR_ATTRS = ['placeholder', 'aria-label', 'title'];
+function trTree(root){
+  if (LANG !== 'es' || !root) return;
+  if (root.nodeType === 3) { const v = tr(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; return; }
+  if (root.nodeType !== 1 || root.closest?.('script,style')) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let n = root; n; n = w.nextNode()) {
+    if (n.nodeType === 3) { if (n.parentNode && !/^(SCRIPT|STYLE|TEXTAREA)$/.test(n.parentNode.nodeName)) { const v = tr(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; } }
+    else for (const a of TR_ATTRS) { const v0 = n.getAttribute?.(a); if (v0) { const v = tr(v0); if (v !== v0) n.setAttribute(a, v); } }
+  }
+}
+new MutationObserver(list => { if (LANG !== 'es') return; for (const m of list) { if (m.type === 'characterData') trTree(m.target); else m.addedNodes.forEach(trTree); } })
+  .observe(document.body, { childList: true, subtree: true, characterData: true });
+// imagens geradas: o texto desenhado no canvas também é traduzido
+{ const P2 = CanvasRenderingContext2D.prototype, ft = P2.fillText, mt = P2.measureText;
+  P2.fillText = function(t, ...a){ return ft.call(this, LANG === 'es' ? tr(t) : t, ...a); };
+  P2.measureText = function(t){ return mt.call(this, LANG === 'es' ? tr(t) : t); }; }
+function setLang(l){ store.set('lang', l === 'es' ? 'es' : 'pt'); location.reload(); }
+if (LANG === 'es') trTree(document.body);
+document.documentElement.lang = LANG === 'es' ? 'es' : 'pt-BR';
 function ago(ts){ const s=Math.round((Date.now()-ts)/1000); return s<5?'agora':s<60?`há ${s}s`:`há ${Math.floor(s/60)} min`; }
 
 /* ---------- fontes de dados ---------- */
@@ -677,6 +845,7 @@ const Screens = {
     view.innerHTML = `
       ${S.stack.length ? `<button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>` : ''}
       <div class="top"><div><span class="kicker">Biblioteca</span><h1>Sua coleção</h1></div></div>
+      <div class="seg" id="langSeg" role="tablist" aria-label="Idioma" style="margin-bottom:14px"><button data-l="pt" class="${LANG==='pt'?'on':''}">Português</button><button data-l="es" class="${LANG==='es'?'on':''}">Español</button></div>
       <button class="row" id="likedRow"><div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#4c2fd6,#9ad8c3);display:grid;place-items:center;flex:none;color:#fff">${I.heartOn}</div>
         <div class="t"><b>Curtidas</b><i>Playlist · ${liked.length} ${liked.length===1?'item':'itens'}</i></div></button>
       <button class="row" id="localRow"><div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#1d8a42,#0d3b1e);display:grid;place-items:center;flex:none;color:#fff"><svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg></div>
@@ -687,6 +856,7 @@ const Screens = {
       <div id="recs">${S.recents.length ? S.recents.map((r,i) => `<button class="row" data-r="${i}">${img(r.art)}<div class="t"><b>${esc(r.title)}</b><i>${{radio:'Rádio ao vivo',album:'Álbum',podcast:'Podcast'}[r.type]||''}</i></div></button>`).join('') : '<p class="empty">Nada por aqui ainda.</p>'}</div>`;
     $('#likedRow').onclick = () => go({type:'liked'});
     $('#localRow').onclick = () => go({type:'local'});
+    $('#langSeg').onclick = e => { const b = e.target.closest('[data-l]'); if (b) setLang(b.dataset.l); };
     $('#follows').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:S.follows[+b.dataset.i].id}); };
     $('#recs').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
       if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
@@ -766,7 +936,7 @@ const Screens = {
           <div class="ep" data-i="${i}">
             <b data-pid="${e.id}" class="${S.cur?.id===e.id?'playing':''}">${esc(e.title)}</b>
             <p>${esc(e.desc||'')}</p>
-            <div class="em"><span>${e.date ? new Date(e.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : ''} · ${Math.round(e.dur/60)} min</span>
+            <div class="em"><span>${e.date ? new Date(e.date).toLocaleDateString(LOC(),{day:'2-digit',month:'short'}) : ''} · ${Math.round(e.dur/60)} min</span>
               <span style="display:flex;gap:4px;align-items:center"><button class="icon-btn ${isLiked(e.id)?'on':''}" data-like="${i}">${isLiked(e.id)?I.heartOn:I.heart}</button><button class="bigplay" data-play="${i}">${I.play}</button></span></div>
           </div>`).join('') || '<p class="empty">Nenhum episódio encontrado.</p>'}</div>`;
       const fol = $('#fol');
@@ -876,13 +1046,13 @@ const nf = new Intl.NumberFormat('pt-BR');
 function fmtN(n){
   if (n == null) return '—';
   const a = Math.abs(n), f = (v, d) => v.toLocaleString('pt-BR', {maximumFractionDigits:d, minimumFractionDigits:0});
-  if (a >= 1e9) return f(n/1e9, 2) + ' bi';
-  if (a >= 1e6) return f(n/1e6, a >= 1e8 ? 0 : a >= 1e7 ? 1 : 2) + ' mi';
+  if (a >= 1e9) return f(n/1e9, 2) + (LANG === 'es' ? ' B' : ' bi');
+  if (a >= 1e6) return f(n/1e6, a >= 1e8 ? 0 : a >= 1e7 ? 1 : 2) + (LANG === 'es' ? ' M' : ' mi');
   if (a >= 1e3) return f(n/1e3, 0) + ' mil';
   return nf.format(n);
 }
 const fmtDate = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}`; };
-const fmtDateLong = d => new Date(d+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'short', year:'numeric'});
+const fmtDateLong = d => new Date(d+'T12:00:00Z').toLocaleDateString(LOC(), {day:'2-digit', month:'short', year:'numeric'});
 function chg(c){ if (c == null) return ''; const up = c >= 0; return `<span class="chg ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(c*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>`; }
 function coverage(st){ return st.complete ? '' : `<span class="note">parcial · ${st.covered} de ${st.days} dias coletados</span>`; }
 const pic = u => esc(viaProxy(u) || '');
@@ -937,7 +1107,7 @@ function buckets(series, period){
   for (const s of series){ const k = s.date.slice(0,7); const b = map.get(k) || {v:0,n:0}; b.v += s.d; b.n++; map.set(k, b); }
   return [...map.entries()].sort().slice(-12).map(([k,b]) => {
     const [y,m] = k.split('-').map(Number), dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const name = new Date(Date.UTC(y, m-1, 15)).toLocaleDateString('pt-BR',{month:'short', year:'2-digit'});
+    const name = new Date(Date.UTC(y, m-1, 15)).toLocaleDateString(LOC(),{month:'short', year:'2-digit'});
     return {label:name, full:`${name} (${b.n} de ${dim} dias)`, v:b.v, partial:b.n<dim};
   });
 }
@@ -1006,6 +1176,7 @@ Object.assign(Screens, {
   async streams(_, alive){
     view.innerHTML = `
       <div class="top"><div style="flex:1;min-width:0"><span class="kicker" id="kick">Streams do Spotify</span><h1>Seus artistas</h1></div>
+        <button class="roundbtn" id="langBtn" aria-label="Idioma" style="font-weight:800;font-size:13px">${LANG === 'es' ? 'ES' : 'PT'}</button>
         <button class="roundbtn" id="addBtn" aria-label="Acompanhar artista">${I.plus}</button></div>
       <div class="addbox" id="addbox" hidden>
         <input id="aq" placeholder="Nome do artista ou link do Spotify" autocomplete="off">
@@ -1015,6 +1186,7 @@ Object.assign(Screens, {
       <div id="alist">${phRows(3)}</div>
       <p class="note" id="foot" style="margin-top:14px;line-height:1.6"></p>`;
     bindSeg(render);
+    $('#langBtn').onclick = () => setLang(LANG === 'es' ? 'pt' : 'es');
     $('#addBtn').onclick = () => { const b = $('#addbox'); b.hidden = !b.hidden; if (!b.hidden) $('#aq').focus(); };
     let t;
     $('#aq').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
@@ -1033,7 +1205,7 @@ Object.assign(Screens, {
       if (!alive()) return;
       const p = S.period;
       const last = artists.map(a => a.lastDate).filter(Boolean).sort().pop();
-      if (last) $('#kick').textContent = 'Dados de ' + new Date(last+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'numeric', month:'long'});
+      if (last) $('#kick').textContent = 'Dados de ' + new Date(last+'T12:00:00Z').toLocaleDateString(LOC(), {day:'numeric', month:'long'});
       const imgTag = (a, cls='') => `<img src="${pic(a.img)}" alt="" ${cls} onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">`;
       const errLine = a => a.error ? `<span class="note" style="color:var(--bad);display:block;margin-top:2px">Última coleta falhou</span>` : '';
       const list = artists.filter(a => !a.pending);
@@ -1066,7 +1238,7 @@ Object.assign(Screens, {
             <div class="v"><b>${fmtN(s.stats[p].value)}</b>${chg(s.stats[p].change)}</div>
           </button>`).join('');
       }).catch(() => {});
-      $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
+      $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
         ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
     } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
   },
@@ -1168,7 +1340,7 @@ Object.assign(Screens, {
 
 /* ---------- charts atuais (Spotify, Apple Music, iTunes) ---------- */
 const SVC_LABEL = {spotify:'Spotify', apple:'Apple Music', itunes:'iTunes'};
-const regionName = (() => { let dn; try { dn = new Intl.DisplayNames(['pt-BR'], {type:'region'}); } catch {} return (cc, fb) => { if (cc === 'global' || cc === 'ww') return 'Global'; try { return (cc.length === 2 && dn?.of(cc.toUpperCase())) || fb; } catch { return fb; } }; })();
+const regionName = (() => { const dns = {}; const get = () => { try { return dns[LANG] ??= new Intl.DisplayNames([LOC()], {type:'region'}); } catch { return null; } }; return (cc, fb) => { if (cc === 'global' || cc === 'ww') return 'Global'; try { return (cc.length === 2 && get()?.of(cc.toUpperCase())) || fb; } catch { return fb; } }; })();
 const flagOf = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))) : '🌐';
 function kworbTime(s){ // "2026-11-23 07:35 EST" -> Date
   const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) (EST|EDT)$/.exec(s || ''); return m ? new Date(`${m[1]}T${m[2]}:00${m[3]==='EDT'?'-04:00':'-05:00'}`) : null;
@@ -1180,10 +1352,17 @@ function chartsBlock(d, isAlbum){
 }
 function chartsInner(c, isAlbum){
   const svcs = Object.keys(SVC_LABEL).filter(k => c.list[k]?.length);
-  const when = kworbTime(c.updated) || (c.fetchedAt && new Date(c.fetchedAt));
-  const head = `<h2>Charts agora <small style="display:flex;align-items:center;gap:6px">${when ? '<span class="dot"></span>atualizado ' + when.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : ''}</small></h2>`;
+  if (svcs.length && !svcs.includes(chartSvc)) chartSvc = svcs[0];
+  // data real de cada serviço: Spotify publica o chart do dia anterior; Apple Music e iTunes, ao longo do dia
+  const D = c.dates || {}, loc = LANG === 'es' ? 'es-419' : 'pt-BR';
+  const dayTxt = d => new Date(d + 'T12:00:00Z').toLocaleDateString(loc, {day:'2-digit', month:'2-digit'});
+  const timeTxt = d => new Date(d).toLocaleString(loc, {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const fallback = kworbTime(c.updated) || (c.fetchedAt && new Date(c.fetchedAt));
+  const when = !svcs.length ? (fallback ? 'atualizado ' + timeTxt(fallback) : '')
+    : chartSvc === 'spotify' ? (isAlbum ? 'chart semanal' : D.spotify ? `chart de ${dayTxt(D.spotify)}` : '')
+    : D[chartSvc] ? `atualizado ${timeTxt(D[chartSvc])}` : fallback ? `atualizado ${timeTxt(fallback)}` : '';
+  const head = `<h2>Charts agora <small style="display:flex;align-items:center;gap:6px">${when ? '<span class="dot"></span>' + when : ''}</small></h2>`;
   if (!svcs.length) return head + `<p class="note">${isAlbum ? 'Este álbum' : 'Esta música'} não está em nenhum chart do Spotify, Apple Music ou iTunes agora.</p>`;
-  if (!svcs.includes(chartSvc)) chartSvc = svcs[0];
   const rows = c.list[chartSvc], shown = chartAll ? rows : rows.slice(0, 15);
   const delta = v => !v ? '<span class="d eq">—</span>' : v === 'NE' ? '<span class="d ne">novo</span>' : v === '=' ? '<span class="d eq">=</span>' : v.startsWith('+') ? `<span class="d up">▲ ${v.slice(1)}</span>` : v.startsWith('-') ? `<span class="d down">▼ ${v.slice(1)}</span>` : `<span class="d eq">${esc(v)}</span>`;
   return head + `
@@ -1309,27 +1488,31 @@ function imgSquare(ctx, im, x, y, s, fallback){ if (im) coverDraw(ctx, im, x, y,
 function drawCD(ctx, cx, cy, r, im, angle, full, u){
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#c9ced3'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle = '#c9ced3'; ctx.fill();
   ctx.restore();
   ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true); ctx.clip('evenodd');
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.arc(cx, cy, r*0.075, 0, Math.PI*2, true); ctx.clip('evenodd');
   const g = ctx.createRadialGradient(cx, cy, r*0.1, cx, cy, r); g.addColorStop(0, '#eef1f4'); g.addColorStop(1, '#aeb4ba');
   ctx.fillStyle = g; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
   const inner = full ? r*0.34 : r*0.36, outer = full ? r*0.985 : r*0.97;
   ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, outer, 0, 7); ctx.arc(cx, cy, inner, 0, 7, true); ctx.clip('evenodd');
+  ctx.beginPath(); ctx.arc(cx, cy, outer, 0, Math.PI*2); ctx.arc(cx, cy, inner, 0, Math.PI*2, true); ctx.clip('evenodd');
   ctx.translate(cx, cy); ctx.rotate(angle); imgSquare(ctx, im, -outer, -outer, 2*outer, '#333'); ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, inner, 0, 7); ctx.arc(cx, cy, r*0.075, 0, 7, true);
+  ctx.beginPath(); ctx.arc(cx, cy, inner, 0, Math.PI*2); ctx.arc(cx, cy, r*0.075, 0, Math.PI*2, true);
   ctx.fillStyle = 'rgba(225,232,238,.55)'; ctx.fill('evenodd');
-  ctx.beginPath(); ctx.arc(cx, cy, r*0.2, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.2, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2*u; ctx.stroke();
   if (ctx.createConicGradient){
-    const s = ctx.createConicGradient(-0.6, cx, cy);
-    [[0,'rgba(255,255,255,0)'],[.08,'rgba(255,255,255,.32)'],[.13,'rgba(120,220,255,.18)'],[.2,'rgba(255,255,255,0)'],
-     [.5,'rgba(255,255,255,0)'],[.58,'rgba(255,255,255,.28)'],[.63,'rgba(255,170,240,.16)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
+    // reflexo suave (faixas largas, sem a ponta afiada no centro)
+    const s = ctx.createConicGradient(-0.9, cx, cy);
+    [[0,'rgba(255,255,255,0)'],[.06,'rgba(255,255,255,.10)'],[.12,'rgba(200,235,255,.16)'],[.18,'rgba(255,220,250,.10)'],[.28,'rgba(255,255,255,0)'],
+     [.5,'rgba(255,255,255,0)'],[.56,'rgba(255,255,255,.08)'],[.62,'rgba(220,255,240,.12)'],[.7,'rgba(255,255,255,.06)'],[.8,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.arc(cx, cy, r*0.22, 0, Math.PI*2, true); ctx.clip('evenodd');
     ctx.fillStyle = s; ctx.fillRect(cx-r, cy-r, 2*r, 2*r);
+    const rg = ctx.createRadialGradient(cx, cy, r*0.22, cx, cy, r); rg.addColorStop(0, 'rgba(255,255,255,.12)'); rg.addColorStop(.5, 'rgba(255,255,255,0)'); rg.addColorStop(1, 'rgba(0,0,0,.08)');
+    ctx.fillStyle = rg; ctx.fillRect(cx-r, cy-r, 2*r, 2*r); ctx.restore();
   }
   ctx.restore();
-  ctx.beginPath(); ctx.arc(cx, cy, r - u, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r - u, 0, Math.PI*2); ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2*u; ctx.stroke();
 }
 // textura de vinil marmorizado na cor da capa (gerada uma vez por arte)
 function vinylTexture(R, size, key){
@@ -1341,7 +1524,7 @@ function vinylTexture(R, size, key){
   const base = p.gray ? hsl(h, 0.02, 0.1) : hsl(h, s, 0.33);
   g.fillStyle = base; g.fillRect(0, 0, S, S);
   // anéis de luz e sombra (sulcos)
-  for (let k = 0; k < 18; k++) { g.beginPath(); g.arc(S/2, S/2, S*(0.18 + rnd()*0.32), 0, 7); g.lineWidth = S*(0.01 + rnd()*0.03); g.strokeStyle = rnd() < 0.5 ? hsl(h, s, 0.42, 0.25) : hsl(h, s, 0.18, 0.35); g.stroke(); }
+  for (let k = 0; k < 18; k++) { g.beginPath(); g.arc(S/2, S/2, S*(0.18 + rnd()*0.32), 0, Math.PI*2); g.lineWidth = S*(0.01 + rnd()*0.03); g.strokeStyle = rnd() < 0.5 ? hsl(h, s, 0.42, 0.25) : hsl(h, s, 0.18, 0.35); g.stroke(); }
   // veios esfumaçados que acompanham o giro do disco (como vinil marmorizado)
   const dark = i => p.gray ? `rgba(70,70,70,${0.18 + rnd()*0.25})` : hsl(h, s*0.9, 0.07, 0.18 + rnd()*0.3);
   g.filter = `blur(${Math.max(2, S/160)}px)`;
@@ -1361,13 +1544,13 @@ function vinylTexture(R, size, key){
 function drawVinyl(ctx, cx, cy, r, im, angle, u, R){
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 40*u; ctx.shadowOffsetY = 14*u;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#0b0b0b'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fillStyle = '#0b0b0b'; ctx.fill();
   ctx.restore();
   ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.clip();
   if (R?.pal) { const tex = vinylTexture(R, Math.ceil(2*r), R.key); ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.drawImage(tex, -r, -r, 2*r, 2*r); ctx.restore(); }
   ctx.lineWidth = 1.2*u;
-  for (let rad = r*0.4; rad < r*0.97; rad += r*0.022){ ctx.beginPath(); ctx.arc(cx, cy, rad, 0, 7); ctx.strokeStyle = `rgba(255,255,255,${rad % (r*0.088) < r*0.022 ? .08 : .035})`; ctx.stroke(); }
+  for (let rad = r*0.4; rad < r*0.97; rad += r*0.022){ ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI*2); ctx.strokeStyle = `rgba(255,255,255,${rad % (r*0.088) < r*0.022 ? .08 : .035})`; ctx.stroke(); }
   if (ctx.createConicGradient){
     const s = ctx.createConicGradient(-0.9, cx, cy);
     [[0,'rgba(255,255,255,0)'],[.1,'rgba(255,255,255,.18)'],[.2,'rgba(255,255,255,0)'],[.5,'rgba(255,255,255,0)'],[.6,'rgba(255,255,255,.12)'],[.7,'rgba(255,255,255,0)'],[1,'rgba(255,255,255,0)']].forEach(([o,c]) => s.addColorStop(o, c));
@@ -1375,10 +1558,10 @@ function drawVinyl(ctx, cx, cy, r, im, angle, u, R){
   }
   // selo central creme
   const lr = r*0.34;
-  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.fillStyle = '#e9e6dc'; ctx.fill();
-  ctx.beginPath(); ctx.arc(cx, cy, lr*0.55, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 2*u; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 3*u; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx, cy, r*0.03, 0, 7); ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, Math.PI*2); ctx.fillStyle = '#e9e6dc'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, lr*0.55, 0, Math.PI*2); ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 2*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, lr, 0, Math.PI*2); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 3*u; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.03, 0, Math.PI*2); ctx.fillStyle = '#1a1a1a'; ctx.fill();
   ctx.restore();
 }
 function drawCase(ctx, x, y, c, im, u){
@@ -1386,7 +1569,7 @@ function drawCase(ctx, x, y, c, im, u){
   rr(ctx, x, y, c, c, 10*u); ctx.fillStyle = '#1a1a1a'; ctx.fill(); ctx.restore();
   ctx.save(); rr(ctx, x, y, c, c, 10*u); ctx.clip();
   const sp = c*0.075;
-  imgSquare(ctx, im, x + sp, y, c - sp, '#333');
+  if (im) coverDraw(ctx, im, x + sp, y, c - sp, c); else { ctx.fillStyle = '#333'; ctx.fillRect(x + sp, y, c - sp, c); }
   const g = ctx.createLinearGradient(x, 0, x + sp, 0); g.addColorStop(0, '#0e0e0e'); g.addColorStop(.6, '#2b2b2b'); g.addColorStop(1, '#111');
   ctx.fillStyle = g; ctx.fillRect(x, y, sp, c);
   ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = u;
@@ -1434,7 +1617,7 @@ function drawArt(ctx, mode, im, x, y, s, round, st, a, spin, u, R){
 async function prepareShare(src, o){
   const Z = SIZES[o.size], W = Z.w, H = Z.h, u = W/1080;
   await Promise.all([document.fonts.load(`800 60px ${FONT}`), document.fonts.load(`700 60px ${SERIF}`)]).catch(()=>{});
-  const im = await loadImg(src.img);
+  const im = await loadImg(o.photo || src.img);
   const pal = palette(im);
   const st = o.style === 'auto' ? autoStyle(pal) : STYLES[o.style];
   const bg = document.createElement('canvas'); bg.width = W; bg.height = H;
@@ -1472,7 +1655,7 @@ function drawFrame(canvas, src, o, R, t){
 
   const P = o.period, stt = src.stats[P], vertical = H/W >= 0.95;
   const M = 72*u;
-  const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
+  const date = src.lastDate ? new Date(src.lastDate+'T12:00:00Z').toLocaleDateString(LOC(), {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
   const wideArt = o.art === 'cd' || o.art === 'vinil';
 
   let cx, cy, cs, tx, ty, tw;
@@ -1490,7 +1673,7 @@ function drawFrame(canvas, src, o, R, t){
   ctx.textAlign = align;
   let dy;
   dy = fadeIn(A(0.5)); ctx.fillStyle = st.accent; ctx.font = `800 ${28*u}px ${FONT}`;
-  ctx.fillText((KIND_LABEL[src.kind] + ' · Spotify').toUpperCase(), ax, ty + dy); ty += 70*u;
+  ctx.fillText('SPOTIFY', ax, ty + dy); ty += 70*u;
   dy = fadeIn(A(0.65)); ctx.fillStyle = st.text; fitFont(ctx, src.title, 800, 76*u, tw, 34*u); ctx.fillText(clip(ctx, src.title, tw), ax, ty + dy); ty += 52*u;
   if (src.artist){ dy = fadeIn(A(0.8)); ctx.fillStyle = st.muted; fitFont(ctx, src.artist, 600, 38*u, tw, 24*u); ctx.fillText(clip(ctx, src.artist, tw), ax, ty + dy); ty += 30*u; }
   ty += 80*u;
@@ -1530,7 +1713,7 @@ function drawFrame(canvas, src, o, R, t){
   }
   ctx.globalAlpha = A(2.4); const fy = H - M + 20*u;
   ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${28*u}px ${FONT}`;
-  ctx.fillText('Sintonia', W - M, fy); const sw = ctx.measureText('Sintonia').width;
+  const mk = o.mark ?? 'Sintonia'; ctx.fillText(mk, W - M, fy); const sw = mk ? ctx.measureText(mk).width : 0;
   ctx.textAlign = 'left'; ctx.fillStyle = st.muted; ctx.font = `600 ${24*u}px ${FONT}`;
   ctx.fillText(clip(ctx, `Atualização: ${date}`, W - 2*M - sw - 40*u), M, fy);
   ctx.globalAlpha = 1;
@@ -1557,7 +1740,7 @@ function drawTable(canvas, src, o, R){
   ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
   ctx.font = `700 34px ${SERIF}`; ctx.fillText((src.artist || src.title).toUpperCase(), cxT, 78);
   fitFont(ctx, title.toUpperCase(), 700, 76, 560, 34, SERIF); ctx.fillText(clip(ctx, title.toUpperCase(), 560), cxT, 140);
-  ctx.textAlign = 'right'; ctx.font = `800 26px ${FONT}`; ctx.globalAlpha = .9; ctx.fillText('Sintonia', W - 50, 70); ctx.globalAlpha = 1;
+  ctx.textAlign = 'right'; ctx.font = `800 26px ${FONT}`; ctx.globalAlpha = .9; ctx.fillText(o.mark ?? 'Sintonia', W - 50, 70); ctx.globalAlpha = 1;
   // faixa da data (em inglês, como o "Daily streams")
   let y = HEAD;
   const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z') : null;
@@ -1597,8 +1780,8 @@ function drawTable(canvas, src, o, R){
   }
   ctx.fillStyle = col.band; ctx.fillRect(0, y, W, FOOT);
   ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `600 22px ${FONT}`; ctx.textAlign = 'left';
-  ctx.fillText(`Atualização: ${dd ? dd.toLocaleDateString('pt-BR') : '—'} · streams do Spotify`, 40, y + FOOT/2);
-  ctx.textAlign = 'right'; ctx.font = `800 24px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText('Sintonia', W - 40, y + FOOT/2);
+  ctx.fillText(`Atualização: ${dd ? dd.toLocaleDateString(LOC()) : '—'} · streams do Spotify`, 40, y + FOOT/2);
+  ctx.textAlign = 'right'; ctx.font = `800 24px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText(o.mark ?? 'Sintonia', W - 40, y + FOOT/2);
 }
 
 /* ---------- modelo PRÊMIOS: resumo das conquistas do artista ---------- */
@@ -1685,9 +1868,9 @@ function drawAwards(canvas, src, o, R){
   }
   // rodapé
   ctx.textAlign = 'left'; ctx.fillStyle = soft; ctx.font = `600 24px ${FONT}`;
-  const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z').toLocaleDateString('pt-BR') : '—';
+  const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z').toLocaleDateString(LOC()) : '—';
   ctx.fillText(`Atualização: ${dd}`, M, H - 40);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.font = `800 28px ${FONT}`; ctx.fillText('Sintonia', W - M, H - 40);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; ctx.font = `800 28px ${FONT}`; ctx.fillText(o.mark ?? 'Sintonia', W - M, H - 40);
 }
 
 /* ---------- exportar: imagem (PNG) ou vídeo (MP4/WebM) ---------- */
@@ -1755,7 +1938,7 @@ async function tableSections(src, ids){
 Screens.share = async function({src}, alive){
   const isAw = src.kind === 'awards';
   const o = { size: store.get('shareSize', 'story'), style: store.get('shareStyle', 'auto'), art: store.get('shareArt', 'padrao'),
-              motion: store.get('shareMotion', false), period: S.period, list: true, tpl: isAw ? 'premios' : store.get('shareTpl', 'card') };
+              motion: store.get('shareMotion', false), period: S.period, list: true, mark: store.get('shareMark', 'Sintonia'), photo: null, tpl: isAw ? 'premios' : store.get('shareTpl', 'card') };
   if (!ARTS[o.art]) o.art = 'padrao';
   if (!STYLES[o.style]) o.style = 'auto';
   if (!isAw && o.tpl === 'premios') o.tpl = 'card';
@@ -1789,7 +1972,15 @@ Screens.share = async function({src}, alive){
     <div id="gPeriod"><h2>Período</h2>
     <div class="seg" id="operiod">${Object.entries(P).map(([k,v]) => `<button data-v="${k}" class="${o.period===k?'on':''}">${v.label}</button>`).join('')}</div>
     ${src.top?.length ? `<label class="note" style="display:flex;gap:8px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="olist" checked> Mostrar ${src.kind==='artist'?'músicas':'faixas'} em alta</label>` : ''}</div>
-    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px;margin-top:8px"></button>
+    <div id="gMark"><h2>Marca d'água e foto</h2>
+      <label class="note" for="omark" style="font-weight:700;display:block">Texto no canto da imagem (deixe vazio para tirar)</label>
+      <input class="filter" id="omark" maxlength="32" value="${esc(o.mark)}" placeholder="Sintonia" style="margin-top:6px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label class="btn ghost" style="cursor:pointer">Trocar foto<input type="file" id="ophoto" accept="image/*" hidden></label>
+        <button class="btn ghost" id="ophotoReset" hidden>Voltar à foto original</button>
+        <span class="note">Use uma foto sua no lugar da capa.</span>
+      </div></div>
+    <button class="btn" id="sbtn" style="width:100%;padding:14px;font-size:15px;margin-top:16px"></button>
     <p class="note" id="snote" style="margin-top:8px"></p>`;
   const cv = $('#cv'), btn = $('#sbtn');
   let R = null, loop = 0, recording = false, prep = Promise.resolve();
@@ -1808,10 +1999,12 @@ Screens.share = async function({src}, alive){
     loop = requestAnimationFrame(f); };
   const redraw = (reprep) => {
     if (reprep || !R) prep = (async () => {
-      if (o.tpl === 'tabela') { const t = await tableSections(src, picked); src.sections = t.secs; src.tableTitle = t.title; R = await prepareShare({...src, img: t.img || src.img}, o); }
+      if (o.tpl === 'tabela') { if (!picked.length) { src.sections = []; R = null; return; } const t = await tableSections(src, picked); src.sections = t.secs; src.tableTitle = t.title; R = await prepareShare({...src, img: t.img || src.img}, o); }
       else R = await prepareShare(src, o);
     })();
-    prep.then(() => { if (!alive()) return; cv.style.aspectRatio = `${cv.width || R.W}/${cv.height || R.H}`;
+    prep.then(() => { if (!alive()) return;
+      if (!R) { stopLoop(); cv.width = 1080; cv.height = 540; const c = cv.getContext('2d'); c.fillStyle = '#ECEAE2'; c.fillRect(0, 0, 1080, 540); c.fillStyle = '#5C6560'; c.textAlign = 'center'; c.font = `700 40px ${FONT}`; c.fillText(tr('Escolha um ou mais álbuns abaixo'), 540, 280); cv.style.aspectRatio = '1080/540'; btn.disabled = true; return; }
+      btn.disabled = false; cv.style.aspectRatio = `${cv.width || R.W}/${cv.height || R.H}`;
       if (isCard() && o.motion) play(); else { stopLoop(); drawFrame(cv, src, o, R, null); } cv.style.aspectRatio = `${cv.width}/${cv.height}`; });
   };
   const bind = (sel, key, persist, reprep, parse = v => v) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b || b.disabled || recording) return; o[key] = parse(b.dataset.v); if (persist) store.set(persist, o[key]);
@@ -1819,9 +2012,12 @@ Screens.share = async function({src}, alive){
   bind('#osize', 'size', 'shareSize', true); bind('#ostyle', 'style', 'shareStyle', true); bind('#oart', 'art', 'shareArt'); bind('#operiod', 'period');
   bind('#omotion', 'motion', 'shareMotion', false, v => v === '1'); bind('#otpl', 'tpl', isAw ? null : 'shareTpl', true);
   $('#oalb').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const id = b.dataset.v;
-    picked = picked.includes(id) ? (picked.length > 1 ? picked.filter(x => x !== id) : picked) : [...picked, id];
+    picked = picked.includes(id) ? picked.filter(x => x !== id) : [...picked, id];
     $('#oalb').querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', picked.includes(x.dataset.v))); redraw(true); };
   if ($('#olist')) $('#olist').onchange = e => { o.list = e.target.checked; redraw(); };
+  let mt; $('#omark').oninput = e => { clearTimeout(mt); mt = setTimeout(() => { o.mark = e.target.value.trim(); store.set('shareMark', o.mark); redraw(); }, 250); };
+  $('#ophoto').onchange = e => { const f = e.target.files[0]; if (!f) return; if (o.photo) URL.revokeObjectURL(o.photo); o.photo = URL.createObjectURL(f); $('#ophotoReset').hidden = false; redraw(true); };
+  $('#ophotoReset').onclick = () => { if (o.photo) URL.revokeObjectURL(o.photo); o.photo = null; $('#ophotoReset').hidden = true; $('#ophoto').value = ''; redraw(true); };
   btn.onclick = async () => {
     if (recording) return;
     await prep;
@@ -1983,7 +2179,7 @@ Screens.awards = async function(_, alive){
       <input class="filter" id="awQ" placeholder="Buscar prêmio, categoria, música, ano…" value="${esc(st.q)}" aria-label="Buscar nos prêmios">
       <div id="awL">${html || '<p class="empty">Nada encontrado com esses filtros.</p>'}</div>
       ${f.length > st.limit ? `<button class="btn ghost" id="awMore" style="width:100%;height:44px;border-radius:14px;margin-top:8px">Mostrar mais (${f.length - st.limit})</button>` : ''}
-      <p class="note" style="margin-top:18px;line-height:1.6">Prêmios reunidos de ${(d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>${x.license ? ` (${x.license})` : ''}`).join(' e ')}. O mesmo prêmio em mais de um lugar conta uma vez só. Categorias da Wikipédia em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString('pt-BR')}.</p>`;
+      <p class="note" style="margin-top:18px;line-height:1.6">Prêmios reunidos de ${(d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>${x.license ? ` (${x.license})` : ''}`).join(' e ')}. O mesmo prêmio em mais de um lugar conta uma vez só. Categorias da Wikipédia em inglês. Atualizado em ${new Date(d.fetchedAt).toLocaleDateString(LOC())}.</p>`;
     const seg = (sel, k, persist) => $(sel) && ($(sel).onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; st[k] = b.dataset.v; if (persist) store.set(persist, st[k]); st.limit = 120; if (k === 'src') st.type = 'all'; paint(); });
     seg('#awR', 'res'); seg('#awG', 'group', 'awGroup'); seg('#awT', 'type'); seg('#awS', 'src');
     const qi = $('#awQ'); let t;
