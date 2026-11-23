@@ -431,7 +431,7 @@ const ES = {
   'Escolha um ou mais álbuns abaixo':'Elige uno o más álbumes abajo', 'Cores da capa':'Colores de la portada', 'Escuro':'Oscuro', 'Capa desfocada':'Portada difuminada', 'Claro':'Claro', 'Neon':'Neón',
   'Padrão':'Estándar', 'capa ou foto':'portada o foto', 'CD + disco':'CD + disco', 'estojo e disco ao lado':'caja y disco al lado', 'Disco':'Disco', 'CD com a arte impressa':'CD con el arte impreso',
   'Vinil':'Vinilo', 'capa e LP girando ao lado':'portada y LP girando al lado', 'Polaroid':'Polaroid', 'foto instantânea':'foto instantánea',
-  'Cartão':'Tarjeta', 'número em destaque':'número destacado', 'Tabela de faixas':'Tabla de canciones', 'total, diário e variação':'total, diario y variación', 'resumo das conquistas':'resumen de logros',
+  'Cartão':'Tarjeta', 'número em destaque':'número destacado', 'Tabela de faixas':'Tabla de canciones', 'Tabela moderna':'Tabla moderna', 'Tabela clássica':'Tabla clásica', 'resumo + faixas com % de variação':'resumen + canciones con % de variación', 'total, diário e variação':'total, diario y variación', 'resumo das conquistas':'resumen de logros',
   'Stories':'Historias', 'Feed 4:5':'Feed 4:5', 'Quadrado':'Cuadrado', 'Paisagem':'Horizontal', 'Mostrar músicas em alta':'Mostrar canciones en tendencia', 'Mostrar faixas em alta':'Mostrar canciones en tendencia',
   'Gerar e compartilhar vídeo':'Generar y compartir video', 'Compartilhar / salvar imagem':'Compartir / guardar imagen', 'Preparando…':'Preparando…',
   'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.':'La altura de la imagen sigue el número de canciones. Los colores vienen de la portada del álbum.',
@@ -1443,7 +1443,8 @@ const ARTS = {
 };
 const TEMPLATES = {
   card:    {label:'Cartão', sub:'número em destaque'},
-  tabela:  {label:'Tabela de faixas', sub:'total, diário e variação'},
+  tabela:  {label:'Tabela moderna', sub:'resumo + faixas com % de variação'},
+  classica:{label:'Tabela clássica', sub:'total, diário e variação'},
   premios: {label:'Prêmios', sub:'resumo das conquistas'},
 };
 const KIND_LABEL = {artist:'Artista', album:'Álbum', song:'Música', awards:'Prêmios'};
@@ -1654,7 +1655,8 @@ async function prepareShare(src, o){
 
 // t = segundos desde o início da animação; null = arte estática (tudo no lugar)
 function drawFrame(canvas, src, o, R, t){
-  if (o.tpl === 'tabela') return drawTable(canvas, src, o, R);
+  if (o.tpl === 'classica') return drawTable(canvas, src, o, R);
+  if (o.tpl === 'tabela') return drawTable2(canvas, src, o, R);
   if (o.tpl === 'premios') return drawAwards(canvas, src, o, R);
   const { W, H, u, st, im, bg } = R;
   if (canvas.width !== W || canvas.height !== H){ canvas.width = W; canvas.height = H; }
@@ -1803,6 +1805,114 @@ function drawTable(canvas, src, o, R){
   ctx.textAlign = 'right'; ctx.font = `800 24px ${FONT}`; ctx.fillStyle = '#fff'; ctx.fillText(o.mark ?? 'Sintonia', W - 40, y + FOOT/2);
 }
 
+/* ---------- modelo TABELA MODERNA: resumo em cartões + faixas com variação em % ---------- */
+function drawTable2(canvas, src, o, R){
+  const secs = src.sections || [], multi = secs.length > 1;
+  const W = 1080, M = 38, rowH = 56, secH = 52;
+  const tracks = secs.flatMap(s => s.tracks);
+  const sum = k => tracks.reduce((a, t) => a + (t[k] || 0), 0);
+  const tDaily = sum('daily'), tChange = sum('change'), tTotal = sum('total'), tPrev = tracks.reduce((a, t) => a + (t.prev || 0), 0);
+  const tPct = tPrev ? tChange / tPrev : null;
+  const HEAD = 470, THEAD = 56, TOTAL = 76, FOOT = 56;
+  const H = HEAD + THEAD + tracks.length * rowH + (multi ? secs.length * secH : 0) + 16 + TOTAL + FOOT;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const p = R.pal && !R.pal.gray ? R.pal : { h: 0.97, s: 0.8 };
+  const BG = '#121214', CARD = '#1e1e21', LINE = 'rgba(255,255,255,.08)', TXT = '#f5f5f7', MUT = '#9a9aa2';
+  const ACC = hsl(p.h, Math.max(p.s, 0.6), 0.58), DOWN = '#ff3b5c', UP = '#22c55e';
+  const sgnCol = v => v == null ? MUT : v >= 0 ? UP : DOWN;
+  const pctTxt = v => v == null ? '—' : `${v >= 0 ? '↑' : '↓'} ${Math.abs(v*100).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}%`;
+  const num = v => v == null ? '—' : nf.format(v);
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+
+  // capa (recorte em pé) com o nome do artista
+  const cx = M, cy = M, cw = 250, ch = 390;
+  ctx.save(); rr(ctx, cx, cy, cw, ch, 22); ctx.clip();
+  if (R.im) coverDraw(ctx, R.im, cx, cy, cw, ch); else { ctx.fillStyle = CARD; ctx.fillRect(cx, cy, cw, ch); }
+  const gs = ctx.createLinearGradient(0, cy + ch*0.6, 0, cy + ch); gs.addColorStop(0, 'rgba(0,0,0,0)'); gs.addColorStop(1, 'rgba(0,0,0,.7)'); ctx.fillStyle = gs; ctx.fillRect(cx, cy, cw, ch);
+  ctx.restore();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; fitFont(ctx, (src.artist || src.title).toUpperCase(), 800, 26, cw - 40, 14); ctx.fillText((src.artist || src.title).toUpperCase(), cx + 22, cy + ch - 24);
+
+  // título, sublinhado e data
+  const rx = cx + cw + 34, rw = W - M - rx;
+  const title = (src.tableTitle || src.title).toUpperCase();
+  ctx.fillStyle = TXT; fitFont(ctx, title, 900, 64, rw, 30); ctx.fillText(title, rx, cy + 58);
+  const tw = Math.min(rw, ctx.measureText(title).width);
+  const ug = ctx.createLinearGradient(rx, 0, rx + tw, 0); ug.addColorStop(0, ACC); ug.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = ug; rr(ctx, rx, cy + 74, tw, 5, 2.5); ctx.fill();
+  const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z') : null;
+  const dtxt = dd ? `${dd.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})} • ${dd.toLocaleDateString('en-US', {weekday:'long'})}`.toUpperCase() : '';
+  ctx.strokeStyle = MUT; ctx.lineWidth = 2; ctx.strokeRect(rx + 1, cy + 104, 20, 18); ctx.fillStyle = MUT; ctx.fillRect(rx + 1, cy + 104, 20, 5);
+  ctx.font = `600 22px ${FONT}`; ctx.fillText(dtxt, rx + 34, cy + 122);
+
+  // cartões: diário, variação, total
+  const y1 = cy + 152, c1w = rw * 0.6, c2w = rw - c1w - 16, c1h = 120;
+  ctx.fillStyle = CARD; rr(ctx, rx, y1, c1w, c1h, 20); ctx.fill();
+  ctx.fillStyle = MUT; ctx.font = `800 17px ${FONT}`; ctx.fillText('DAILY STREAMS', rx + 22, y1 + 36);
+  ctx.fillStyle = TXT; fitFont(ctx, num(tDaily), 900, 62, c1w - 44, 30); ctx.fillText(num(tDaily), rx + 22, y1 + 98);
+  ctx.fillStyle = tPct == null ? CARD : sgnCol(tChange); rr(ctx, rx + c1w + 16, y1, c2w, c1h, 20); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = `800 17px ${FONT}`; ctx.fillText('CHANGE', rx + c1w + 36, y1 + 36);
+  ctx.fillStyle = '#fff'; fitFont(ctx, pctTxt(tPct), 900, 50, c2w - 40, 22); ctx.fillText(pctTxt(tPct), rx + c1w + 36, y1 + 96);
+  const y2 = y1 + c1h + 16, c3h = cy + ch - y2;
+  ctx.save(); rr(ctx, rx, y2, rw, c3h, 20); ctx.clip();
+  ctx.fillStyle = CARD; ctx.fillRect(rx, y2, rw, c3h);
+  const glow = ctx.createRadialGradient(rx + rw - 70, y2 + c3h, 10, rx + rw - 70, y2 + c3h, 230); glow.addColorStop(0, hsl(p.h, Math.max(p.s, .6), 0.45, .45)); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow; ctx.fillRect(rx, y2, rw, c3h);
+  if (R.im) { const rad = 62, ccx = rx + rw - 90, ccy = y2 + c3h - 30;
+    ctx.save(); ctx.beginPath(); ctx.arc(ccx, ccy, rad, 0, Math.PI*2); ctx.clip(); coverDraw(ctx, R.im, ccx - rad, ccy - rad, 2*rad, 2*rad); ctx.restore();
+    ctx.beginPath(); ctx.arc(ccx, ccy, rad, 0, Math.PI*2); ctx.strokeStyle = ACC; ctx.lineWidth = 3; ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = MUT; ctx.font = `800 17px ${FONT}`; ctx.fillText('TOTAL STREAMS', rx + 22, y2 + 36);
+  ctx.fillStyle = TXT; fitFont(ctx, num(tTotal), 900, 50, rw - 200, 24); ctx.fillText(num(tTotal), rx + 22, y2 + 88);
+
+  // tabela
+  ctx.font = `700 26px ${FONT}`;
+  const wTot = Math.max(90, ...tracks.map(t => ctx.measureText(num(t.total)).width), ctx.measureText(num(tTotal)).width);
+  const wDay = Math.max(110, ...tracks.map(t => ctx.measureText(num(t.daily)).width));
+  const X = { n: M + 14, name: M + 50, total: W - M - 10 };
+  X.pct = X.total - wTot - 80; X.change = X.pct - 150; X.daily = X.change - 70 - wDay/2 - 40;
+  let y = HEAD;
+  ctx.fillStyle = MUT; ctx.font = `800 17px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('TRACK', X.name, y + 32);
+  ctx.textAlign = 'center'; ctx.fillText('DAILY STREAMS', X.daily, y + 32); ctx.fillText('CHANGE', X.change, y + 32); ctx.fillText('% CHANGE', X.pct, y + 32);
+  ctx.textAlign = 'right'; ctx.fillText('TOTAL', X.total, y + 32);
+  y += THEAD; ctx.fillStyle = LINE; ctx.fillRect(M, y - 1, W - 2*M, 2);
+  let i = 0;
+  const bar = (cxm, yy, v) => { const bw = 108; ctx.fillStyle = 'rgba(255,255,255,.14)'; rr(ctx, cxm - bw/2, yy, bw, 6, 3); ctx.fill();
+    if (v != null) { ctx.fillStyle = sgnCol(v); rr(ctx, cxm - bw/2, yy, Math.max(6, bw * Math.min(1, Math.abs(v))), 6, 3); ctx.fill(); } };
+  for (const sec of secs) {
+    if (multi) {
+      ctx.fillStyle = ACC; ctx.textAlign = 'left'; ctx.font = `900 21px ${FONT}`;
+      ctx.fillText(`${sec.name.toUpperCase()}${sec.day ? `  ·  DAY ${sec.day}` : ''}`, M + 14, y + 34); y += secH;
+    }
+    for (const t of sec.tracks) {
+      i++;
+      const mid = y + rowH/2 + 9, pct = t.prev ? t.change / t.prev : null;
+      ctx.textAlign = 'left'; ctx.fillStyle = MUT; ctx.font = `600 18px ${FONT}`; ctx.fillText(String(i), X.n, mid);
+      const nameW = X.daily - wDay/2 - X.name - 24;
+      ctx.fillStyle = TXT; fitFont(ctx, t.name, 800, 26, nameW, 16); ctx.fillText(clip(ctx, t.name, nameW), X.name, mid);
+      ctx.textAlign = 'center'; ctx.font = `700 26px ${FONT}`; ctx.fillStyle = TXT; ctx.fillText(num(t.daily), X.daily, mid);
+      ctx.fillStyle = sgnCol(t.change); ctx.fillText(t.change == null ? '—' : (t.change > 0 ? '+' : '') + num(t.change), X.change, mid);
+      ctx.font = `800 21px ${FONT}`; ctx.fillStyle = sgnCol(pct); ctx.fillText(pctTxt(pct), X.pct, mid - 6); bar(X.pct, mid + 6, pct);
+      ctx.textAlign = 'right'; ctx.font = `700 26px ${FONT}`; ctx.fillStyle = TXT; ctx.fillText(num(t.total), X.total, mid);
+      y += rowH; ctx.fillStyle = LINE; ctx.fillRect(M, y - 1, W - 2*M, 2);
+    }
+  }
+  // total
+  y += 16;
+  ctx.fillStyle = CARD; rr(ctx, M, y, W - 2*M, TOTAL - 8, 18); ctx.fill();
+  const mid = y + (TOTAL - 8)/2 + 9;
+  ctx.textAlign = 'left'; ctx.fillStyle = TXT; ctx.font = `900 27px ${FONT}`; ctx.fillText('TOTAL', X.name - 30, mid);
+  ctx.textAlign = 'center'; ctx.font = `800 26px ${FONT}`; ctx.fillText(num(tDaily), X.daily, mid);
+  ctx.fillStyle = tPrev ? sgnCol(tChange) : MUT; ctx.fillText(tPrev ? (tChange > 0 ? '+' : '') + num(tChange) : '—', X.change, mid);
+  ctx.font = `800 21px ${FONT}`; ctx.fillStyle = sgnCol(tPct); ctx.fillText(pctTxt(tPct), X.pct, mid - 6); bar(X.pct, mid + 6, tPct);
+  ctx.textAlign = 'right'; ctx.font = `800 26px ${FONT}`; ctx.fillStyle = TXT; ctx.fillText(num(tTotal), X.total, mid);
+  // rodapé
+  ctx.textAlign = 'left'; ctx.fillStyle = MUT; ctx.font = `600 18px ${FONT}`;
+  ctx.fillText(`Atualização: ${dd ? dd.toLocaleDateString('pt-BR') : '—'} · streams do Spotify`, M, H - 22);
+  if (o.mark ?? 'Sintonia') { ctx.textAlign = 'right'; ctx.fillStyle = TXT; ctx.font = `800 20px ${FONT}`; ctx.fillText(o.mark ?? 'Sintonia', W - M, H - 22); }
+}
+
 /* ---------- modelo PRÊMIOS: resumo das conquistas do artista ---------- */
 const workKey = n => String(n || '').replace(/\s*\((with|feat|ft)[^)]*\)/gi, '').trim();
 function awardsSummary(src){
@@ -1942,7 +2052,7 @@ async function tableSections(src, ids){
   const last = src.lastDate ? Date.parse(src.lastDate + 'T00:00:00Z') : Date.now();
   const secs = albums.map(a => {
     const tracks = a.tracks.filter(t => { const k = key(t.name); if (seen.has(k)) return false; seen.add(k); return true; })
-      .map(t => ({ name: t.name, total: t.stats?.total ?? null, daily: t.stats?.day.value ?? null, change: t.stats && t.stats.day.prev != null ? t.stats.day.value - t.stats.day.prev : null }));
+      .map(t => ({ name: t.name, total: t.stats?.total ?? null, daily: t.stats?.day.value ?? null, change: t.stats && t.stats.day.prev != null ? t.stats.day.value - t.stats.day.prev : null, prev: t.stats?.day.prev ?? null }));
     const day = a.release ? Math.floor((last - Date.parse(a.release.slice(0, 10) + 'T00:00:00Z')) / 864e5) + 1 : null;
     return { name: a.name, day: day > 0 ? day : null, tracks, img: a.img };
   }).filter(s => s.tracks.length);
@@ -1961,7 +2071,8 @@ Screens.share = async function({src}, alive){
   if (!ARTS[o.art]) o.art = 'padrao';
   if (!STYLES[o.style]) o.style = 'auto';
   if (!isAw && o.tpl === 'premios') o.tpl = 'card';
-  if (o.tpl === 'tabela' && src.kind === 'song') o.tpl = 'card';
+  const isTbl = () => o.tpl === 'tabela' || o.tpl === 'classica';
+  if (isTbl() && src.kind === 'song') o.tpl = 'card';
   const canVideo = !!videoMime();
   if (!canVideo) o.motion = false;
   // álbuns disponíveis para a tabela
@@ -1971,7 +2082,7 @@ Screens.share = async function({src}, alive){
     if (!alive()) return;
     picked = src.albumId ? [src.albumId] : albumList.slice(0, 1).map(a => a.id);
   }
-  const tpls = Object.entries(TEMPLATES).filter(([k]) => isAw ? k === 'premios' : k === 'card' || (k === 'tabela' && src.kind !== 'song'));
+  const tpls = Object.entries(TEMPLATES).filter(([k]) => isAw ? k === 'premios' : k === 'card' || ((k === 'tabela' || k === 'classica') && src.kind !== 'song'));
   view.innerHTML = `
     <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
     <h1>Criar imagem</h1>
@@ -2005,12 +2116,12 @@ Screens.share = async function({src}, alive){
   let R = null, loop = 0, recording = false, prep = Promise.resolve();
   const isCard = () => o.tpl === 'card';
   const show = () => {
-    $('#gAlbums').hidden = o.tpl !== 'tabela';
+    $('#gAlbums').hidden = !isTbl();
     $('#gMotion').hidden = !isCard(); $('#gArt').hidden = !isCard(); $('#gPeriod').hidden = !isCard();
-    $('#gSize').hidden = o.tpl === 'tabela'; $('#gStyle').hidden = o.tpl !== 'card';
+    $('#gSize').hidden = isTbl(); $('#gStyle').hidden = o.tpl !== 'card';
     btn.textContent = isCard() && o.motion ? 'Gerar e compartilhar vídeo' : 'Compartilhar / salvar imagem';
     $('#snote').textContent = isCard() && o.motion ? `O vídeo é gravado em tempo real (${MOTION_SECS}s) no formato ${(videoMime()||'').includes('mp4') ? 'MP4' : 'WebM'}.`
-      : o.tpl === 'tabela' ? 'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.' : o.tpl === 'premios' ? 'As cores vêm da foto do artista.' : '';
+      : isTbl() ? 'A altura da imagem acompanha o número de faixas. As cores vêm da capa do álbum.' : o.tpl === 'premios' ? 'As cores vêm da foto do artista.' : '';
   };
   const stopLoop = () => { cancelAnimationFrame(loop); loop = 0; };
   const play = () => { stopLoop(); const t0 = performance.now();
@@ -2018,7 +2129,7 @@ Screens.share = async function({src}, alive){
     loop = requestAnimationFrame(f); };
   const redraw = (reprep) => {
     if (reprep || !R) prep = (async () => {
-      if (o.tpl === 'tabela') { if (!picked.length) { src.sections = []; R = null; return; } const t = await tableSections(src, picked); src.sections = t.secs; src.tableTitle = t.title; R = await prepareShare({...src, img: t.img || src.img}, o); }
+      if (isTbl()) { if (!picked.length) { src.sections = []; R = null; return; } const t = await tableSections(src, picked); src.sections = t.secs; src.tableTitle = t.title; R = await prepareShare({...src, img: t.img || src.img}, o); }
       else R = await prepareShare(src, o);
     })();
     prep.then(() => { if (!alive()) return;
@@ -2041,7 +2152,7 @@ Screens.share = async function({src}, alive){
     if (recording) return;
     await prep;
     try {
-      if (!(isCard() && o.motion)){ const blob = await new Promise(r => cv.toBlob(r, 'image/png')); return await exportBlob(blob, fileBase(src.tableTitle && o.tpl === 'tabela' ? src.tableTitle : src.title) + '.png', src.title, 'imagem'); }
+      if (!(isCard() && o.motion)){ const blob = await new Promise(r => cv.toBlob(r, 'image/png')); return await exportBlob(blob, fileBase(src.tableTitle && isTbl() ? src.tableTitle : src.title) + '.png', src.title, 'imagem'); }
       recording = true; stopLoop(); btn.disabled = true;
       const blob = await recordMotion(cv, src, o, R, t => { btn.textContent = `Gravando vídeo… ${Math.min(MOTION_SECS, Math.floor(t))}/${MOTION_SECS}s`; });
       btn.textContent = 'Preparando…';
