@@ -4,9 +4,11 @@
   "version": "1.0.0",
   "description": "Casca Android (Capacitor) que abre o site do Sintonia no GitHub Pages",
   "dependencies": {
+    "@capacitor-community/fcm": "^7.0.0",
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/push-notifications": "^7.0.0",
     "@capacitor/share": "^7.0.0"
   },
   "devDependencies": {

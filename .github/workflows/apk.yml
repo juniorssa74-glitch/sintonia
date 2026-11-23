@@ -30,7 +30,14 @@ jobs:
 
       - name: Montar projeto Android (Capacitor)
         working-directory: android-shell
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
+          # notificações só entram no APK quando o Firebase está configurado (segredo GOOGLE_SERVICES_JSON)
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "Firebase não configurado: APK sem notificações"
+            node -e "const f='package.json';const p=require('./'+f);delete p.dependencies['@capacitor/push-notifications'];delete p.dependencies['@capacitor-community/fcm'];require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+          fi
           OWNER="${GITHUB_REPOSITORY%%/*}"; REPO="${GITHUB_REPOSITORY##*/}"
           OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           URL="https://${OWNER_LC}.github.io/${REPO}/"
@@ -38,6 +45,10 @@ jobs:
           node -e "const f='capacitor.config.json';const c=require('./'+f);c.server.url=process.argv[1];c.server.allowNavigation=[new URL(process.argv[1]).host,'accounts.spotify.com','*.spotify.com','*.scdn.co','challenge.spotify.com'];require('fs').writeFileSync(f,JSON.stringify(c,null,2))" "$URL"
           npm install
           npx cap add android
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            node -e "const j=require('./android/app/google-services.json');const ok=j.client.some(c=>c.client_info.android_client_info.package_name==='app.sintonia.streams');if(!ok){console.error('google-services.json não tem o pacote app.sintonia.streams');process.exit(1)}console.log('Firebase:',j.project_info.project_id)"
+          fi
           (npm run icon && npx capacitor-assets generate --android) || echo "usando ícone padrão"
           npx cap sync android
 
@@ -47,7 +58,7 @@ jobs:
           SRC=app/src/main/java/app/sintonia/streams
           cp ../native/MainActivity.java ../native/LocalAudioPlugin.java "$SRC/"
           M=app/src/main/AndroidManifest.xml
-          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>#' "$M"
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n</manifest>#' "$M"
           grep -q READ_MEDIA_AUDIO "$M" || { echo "permissão não adicionada"; exit 1; }
           cat "$M"
 

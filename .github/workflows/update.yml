@@ -39,6 +39,7 @@ jobs:
         id: collect
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node scripts/collect.js
 
       - name: Salvar histórico no repositório

@@ -7,5 +7,16 @@
     "url": "https://SEU-USUARIO.github.io/sintonia/",
     "androidScheme": "https"
   },
-  "android": { "allowMixedContent": false }
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
+  }
 }

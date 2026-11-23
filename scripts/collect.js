@@ -38,6 +38,8 @@ const T = require('../lib/tracker');
   for (const a of tracked) { const s = await T.buildArtist(a.id); if (s) summary.push({ ...s, error: a.error || null }); }
   T.saveCovers();
   T.writeJSON(path.join(T.OUT, 'summary.json'), { generatedAt: new Date().toISOString(), repo: process.env.GITHUB_REPOSITORY || null, artists: summary });
+  // novidades nos charts → notificações (Firebase)
+  try { await require('../lib/notify').run(T.chartSnap, log); } catch (e) { log('notificações falharam:', e.message); }
   try { log('índice de artistas:', await T.buildArtistIndex()); } catch (e) { log('índice falhou:', e.message); }
   try { await T.buildCharts(); log('paradas atualizadas'); } catch (e) { log('paradas falharam:', e.message); }
 

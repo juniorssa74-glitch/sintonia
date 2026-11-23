@@ -313,6 +313,8 @@ a.pill{text-decoration:none;display:inline-block}
 .awhero img{max-width:100%;max-height:228px;width:auto;height:auto;object-fit:contain;border-radius:12px}
 .awimg.mono.big{width:140px;height:140px;border-radius:32px;font-size:44px}
 button.awrow{font:inherit;color:inherit;cursor:pointer}
+.roundbtn.on{background:var(--accent);color:#fff}
+.roundbtn.on .ln{stroke:#fff}
 .ln{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 </style>
 </head>
@@ -373,6 +375,7 @@ const I = {
   back:'<svg class="ln" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M15 18l-6-6 6-6"/></svg>',
   more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   img:'<svg class="ln" viewBox="0 0 24 24" style="stroke-width:2.2"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>',
+  bell:'<svg class="ln" viewBox="0 0 24 24" style="stroke-width:2"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
   plus:'<svg class="ln" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 5v14M5 12h14"/></svg>',
   right:'<svg class="ln" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
   search:'<svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>',
@@ -393,7 +396,7 @@ const store = {
   get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+function toast(msg, ms = 1800){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), ms); }
 /* =================== IDIOMA (português / español) =================== */
 // As telas são escritas em português; em espanhol, os textos são trocados ao aparecer na tela
 // (e também nas imagens geradas). Nomes de músicas, álbuns e artistas não mudam.
@@ -469,6 +472,10 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Notificações':'Notificaciones', 'As notificações funcionam no app Android. Instale o APK mais novo.':'Las notificaciones funcionan en la app de Android. Instala el APK más reciente.',
+  'Permita as notificações do Sintonia nas configurações do Android.':'Permite las notificaciones de Sintonia en los ajustes de Android.',
+  'Notificações ligadas: aviso quando uma música entrar em um país novo ou subir ao top 10 ou #1.':'Notificaciones activadas: aviso cuando una canción entre en un país nuevo o suba al top 10 o al #1.',
+  'Notificações desligadas.':'Notificaciones desactivadas.', 'Não foi possível ligar as notificações.':'No se pudieron activar las notificaciones.',
   'iTunes Latin: chart do gênero latino do iTunes em cada país. Fonte: LivePopBars, coletado de hora em hora.':'iTunes Latin: chart del género latino de iTunes en cada país. Fuente: LivePopBars, recopilado cada hora.',
   'Ouvintes mensais':'Oyentes mensuales', 'O gráfico aparece a partir do 2º dia de coleta.':'El gráfico aparece a partir del 2º día de recopilación.',
   'Sobre a premiação':'Sobre la premiación', 'Indicado(a)':'Nominado(a)', 'Ver fotos no acervo':'Ver fotos en el acervo', 'Ler na Wikipédia':'Leer en Wikipedia',
@@ -1218,6 +1225,7 @@ Object.assign(Screens, {
   async streams(_, alive){
     view.innerHTML = `
       <div class="top"><div style="flex:1;min-width:0"><span class="kicker" id="kick">Streams do Spotify</span><h1>Seus artistas</h1></div>
+        <button class="roundbtn${notifGet() && notifOk() ? ' on' : ''}" id="bellBtn" aria-label="Notificações" aria-pressed="${notifGet() && notifOk()}">${I.bell}</button>
         <button class="roundbtn" id="langBtn" aria-label="Idioma" style="font-weight:800;font-size:13px">${LANG === 'es' ? 'ES' : 'PT'}</button>
         <button class="roundbtn" id="addBtn" aria-label="Acompanhar artista">${I.plus}</button></div>
       <div class="addbox" id="addbox" hidden>
@@ -1229,6 +1237,7 @@ Object.assign(Screens, {
       <p class="note" id="foot" style="margin-top:14px;line-height:1.6"></p>`;
     bindSeg(render);
     $('#langBtn').onclick = () => setLang(LANG === 'es' ? 'pt' : 'es');
+    $('#bellBtn').onclick = notifToggle;
     $('#addBtn').onclick = () => { const b = $('#addbox'); b.hidden = !b.hidden; if (!b.hidden) $('#aq').focus(); };
     let t;
     $('#aq').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
@@ -2622,6 +2631,41 @@ function capPlugin(name){
   capPlugin.cache ??= {};
   return capPlugin.cache[name] ??= (C.registerPlugin ? C.registerPlugin(name) : C.Plugins?.[name] || null);
 }
+/* ---------- notificações (APK com Firebase): entradas em países novos, top 10 e #1 ---------- */
+const notifOk = () => { const C = window.Capacitor; return !!(C?.isNativePlatform?.() && C.isPluginAvailable?.('PushNotifications') && C.isPluginAvailable?.('FCM')); };
+function notifGet(){ try { return localStorage.getItem('notif') === 'on'; } catch { return false; } }
+function notifSet(v){ try { localStorage.setItem('notif', v ? 'on' : 'off'); } catch {} }
+async function notifEnable(on){
+  const P = capPlugin('PushNotifications'), F = capPlugin('FCM');
+  if (on) {
+    let perm = await P.checkPermissions();
+    if (perm.receive !== 'granted') perm = await P.requestPermissions();
+    if (perm.receive !== 'granted') return false;
+    await P.register();
+    await F.subscribeTo({ topic: 'sintonia-' + LANG });
+    await F.unsubscribeFrom({ topic: 'sintonia-' + (LANG === 'es' ? 'pt' : 'es') }).catch(() => {});
+  } else for (const l of ['pt', 'es']) await F.unsubscribeFrom({ topic: 'sintonia-' + l }).catch(() => {});
+  return true;
+}
+async function notifToggle(){
+  const b = $('#bellBtn');
+  if (!notifOk()) return toast('As notificações funcionam no app Android. Instale o APK mais novo.', 3500);
+  const on = !notifGet();
+  try {
+    if (!(await notifEnable(on))) return toast('Permita as notificações do Sintonia nas configurações do Android.', 3500);
+    notifSet(on);
+    if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
+    toast(on ? 'Notificações ligadas: aviso quando uma música entrar em um país novo ou subir ao top 10 ou #1.' : 'Notificações desligadas.', on ? 4000 : 1800);
+  } catch (e) { toast('Não foi possível ligar as notificações.', 3000); }
+}
+function notifInit(){
+  if (!notifOk()) return;
+  capPlugin('PushNotifications').addListener('pushNotificationActionPerformed', a => {
+    const d = a?.notification?.data || {};
+    if (d.artistId && d.id) go({ type: 'streamItem', artistId: d.artistId, kind: d.kind || 'songs', id: d.id });
+  });
+  if (notifGet()) notifEnable(true).catch(() => {}); // reassina no idioma atual
+}
 const isWhatsApp = s => /whatsapp|com\.whatsapp|^(ptt|aud)-\d{8}-wa\d+/i.test(s);
 S.localTracks = null;
 function localItem(t){ return { kind:'local', id:'l'+t.id, title:t.title, sub:[t.artist, t.album].filter(Boolean).join(' · ') || 'No celular', art:LOCAL_ART, url:t.url, dur:t.duration/1000 }; }
@@ -2677,6 +2721,7 @@ function spark(pts){
 
 render();
 spHandleRedirect().then(done => { if (done) render(); });
+try { notifInit(); } catch {}
 </script>
 </body>
 </html>
