@@ -888,11 +888,26 @@ function coverage(st){ return st.complete ? '' : `<span class="note">parcial · 
 const pic = u => esc(viaProxy(u) || '');
 const toSeries = arr => arr.map(([date, t, d]) => ({date, t, d}));
 // Pedidos de adicionar/remover viram uma issue no repositório; o GitHub Actions processa.
+// Com a chave do GitHub salva no aparelho, o app cria a issue sozinho (sem abrir o GitHub).
 let REPO = null;
-function issueLink(action, id, name){
+const GH_KEY = 'ghToken';
+async function issueLink(action, id, name){
   if (!REPO) { toast('Disponível na versão online (GitHub)'); return; }
   const title = `${action} ${id}: ${name}`;
-  const body = `Pedido feito pelo app Sintonia.\n\nAo enviar esta issue, a coleta roda e a lista de artistas é atualizada em ~2 minutos.`;
+  const body = `Pedido feito pelo app Sintonia.\n\nA coleta roda e a lista de artistas é atualizada em ~2 minutos.`;
+  const tok = store.get(GH_KEY, null);
+  if (!tok) return go({type:'ghsetup', pending:{action, id, name}});
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/issues`, { method: 'POST',
+      headers: { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body }) });
+    if (r.ok) { toast(action === 'Remover' ? `Removendo ${name}… some da lista em ~2 min` : `Adicionando ${name}… aparece em ~2 min`); return true; }
+    if (r.status === 401 || r.status === 403 || r.status === 404) { toast('A chave do GitHub não funcionou. Confira e salve de novo.'); return go({type:'ghsetup', pending:{action, id, name}, bad:true}); }
+    toast(`GitHub respondeu ${r.status}. Tente de novo em instantes.`);
+  } catch { toast('Sem conexão com o GitHub. Tente de novo.'); }
+}
+function issueOpen(action, id, name){
+  const title = `${action} ${id}: ${name}`, body = 'Pedido feito pelo app Sintonia.';
   window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, '_blank');
   toast('Envie a issue no GitHub para confirmar');
 }
@@ -1052,7 +1067,7 @@ Object.assign(Screens, {
           </button>`).join('');
       }).catch(() => {});
       $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
-        ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a>` : ''}`;
+        ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
     } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
   },
 
@@ -1820,6 +1835,49 @@ Screens.share = async function({src}, alive){
     finally { recording = false; btn.disabled = false; show(); if (isCard() && o.motion) play(); }
   };
   show(); redraw(true);
+};
+
+/* =================== CHAVE DO GITHUB (adicionar/remover artista sem abrir o GitHub) =================== */
+Screens.ghsetup = function({pending, bad}){
+  const has = !!store.get(GH_KEY, null);
+  const owner = (REPO || '').split('/')[0], repo = (REPO || '').split('/')[1] || 'sintonia';
+  const url = `https://github.com/settings/personal-access-tokens/new?name=${encodeURIComponent('Sintonia app')}&description=${encodeURIComponent('Adicionar e remover artistas pelo app Sintonia')}&target_name=${encodeURIComponent(owner)}&expires_in=none&issues=write`;
+  view.innerHTML = `
+    <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
+    <span class="kicker">Configuração única</span>
+    <h1 style="margin-bottom:8px">Chave do GitHub</h1>
+    <p class="sub" style="line-height:1.55;margin-bottom:16px">Com ela, o app ${pending ? `${pending.action === 'Remover' ? 'remove' : 'adiciona'} <b>${esc(pending.name)}</b>` : 'adiciona e remove artistas'} sozinho, sem abrir o GitHub. A chave fica salva só neste aparelho.</p>
+    ${bad ? `<p class="note" style="color:var(--bad);font-weight:700;margin-bottom:12px">A chave salva não funcionou (expirou ou está sem permissão). Crie outra.</p>` : ''}
+    <div class="kpi" style="gap:12px;margin-bottom:14px">
+      <b style="font-size:15px">Como criar (1 minuto)</b>
+      <ol style="margin:0 0 0 18px;line-height:1.6;font-size:13px;color:var(--muted)">
+        <li>Toque em <b>Criar chave no GitHub</b>. A página abre já preenchida.</li>
+        <li>Em <b>Repository access</b>, escolha <b>Only select repositories</b> e marque <b>${esc(repo)}</b>.</li>
+        <li>Em <b>Permissions</b>, confira <b>Issues: Read and write</b>.</li>
+        <li>Toque em <b>Generate token</b>, copie o código (começa com <code>github_pat_</code>) e cole abaixo.</li>
+      </ol>
+      <a class="btn" href="${esc(url)}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:12px">Criar chave no GitHub</a>
+    </div>
+    <label for="ghtok" class="note" style="font-weight:700;display:block;margin-bottom:4px">Cole a chave aqui</label>
+    <input class="filter" id="ghtok" type="password" autocomplete="off" placeholder="github_pat_…" style="margin-top:0">
+    <button class="btn" id="ghsave" style="width:100%;height:48px;border-radius:14px;margin-top:4px">Salvar${pending ? ' e continuar' : ''}</button>
+    ${pending ? `<button class="btn ghost" id="ghweb" style="width:100%;height:44px;border-radius:14px;margin-top:10px">Agora não: abrir o GitHub desta vez</button>` : ''}
+    ${has ? `<button class="btn ghost" id="ghdel" style="width:100%;height:44px;border-radius:14px;margin-top:10px;color:var(--bad)">Apagar a chave deste aparelho</button>` : ''}
+    <p class="note" id="ghmsg" style="margin-top:12px"></p>`;
+  $('#ghsave').onclick = async () => {
+    const tok = $('#ghtok').value.trim();
+    if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(tok)) { $('#ghmsg').textContent = 'Isso não parece uma chave do GitHub (começa com github_pat_).'; return; }
+    $('#ghmsg').textContent = 'Conferindo…';
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO}`, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' } });
+      if (!r.ok) { $('#ghmsg').textContent = r.status === 404 ? `A chave não tem acesso ao repositório ${repo}. Marque-o em Repository access.` : 'O GitHub recusou a chave. Confira se copiou inteira.'; return; }
+    } catch { $('#ghmsg').textContent = 'Sem conexão com o GitHub agora.'; return; }
+    store.set(GH_KEY, tok); toast('Chave salva neste aparelho');
+    back();
+    if (pending) issueLink(pending.action, pending.id, pending.name);
+  };
+  if ($('#ghweb')) $('#ghweb').onclick = () => { back(); issueOpen(pending.action, pending.id, pending.name); };
+  if ($('#ghdel')) $('#ghdel').onclick = () => { try { localStorage.removeItem(GH_KEY); } catch {} toast('Chave apagada'); back(); };
 };
 
 /* =================== PRÊMIOS (AWARDS) =================== */
