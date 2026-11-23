@@ -465,6 +465,15 @@ const ES = {
   'Filtrar por nome, artista ou álbum…':'Filtrar por nombre, artista o álbum…', 'Sem áudio disponível':'Sin audio disponible', 'Não foi possível tocar este áudio':'No se pudo reproducir este audio',
   'Permissão negada nas configurações do Android':'Permiso denegado en la configuración de Android', 'Não foi possível ler as músicas':'No se pudo leer la música', 'Lendo…':'Leyendo…',
   'Gênero':'Género',
+  'Conecte seu Spotify':'Conecta tu Spotify', 'Músicas completas, suas playlists e o que está tocando':'Canciones completas, tus playlists y lo que está sonando', 'Conectar Spotify':'Conectar Spotify',
+  'Configurar e conectar':'Configurar y conectar', 'Suas playlists':'Tus playlists', 'Curtidas no Spotify':'Tus me gusta en Spotify', 'Mais ouvidas por você':'Lo que más escuchas', 'últimas semanas':'últimas semanas',
+  'Nada tocando no Spotify':'Nada sonando en Spotify', 'Escolha uma playlist ou música abaixo':'Elige una playlist o canción abajo', 'Abrir Spotify':'Abrir Spotify', 'TOCANDO AGORA':'SONANDO AHORA', 'PAUSADO':'EN PAUSA',
+  'Nenhuma playlist.':'Ninguna playlist.', 'Nenhuma música curtida.':'Ninguna canción con me gusta.', 'Ainda sem dados.':'Aún sin datos.', 'Playlist vazia.':'Playlist vacía.', 'Tocar playlist':'Reproducir playlist',
+  'O Spotify só mostra as faixas de playlists criadas por você. Esta dá para tocar inteira pelo botão acima.':'Spotify solo muestra las canciones de playlists creadas por ti. Esta se puede reproducir completa con el botón de arriba.',
+  'Spotify conectado':'Spotify conectado', 'Spotify desconectado':'Spotify desconectado', 'Conexão com o Spotify cancelada':'Conexión con Spotify cancelada', 'Não foi possível conectar o Spotify. Tente de novo.':'No se pudo conectar Spotify. Inténtalo de nuevo.',
+  'Abra o app do Spotify neste celular e toque de novo.':'Abre la app de Spotify en este celular y toca de nuevo.', 'Controlar a reprodução exige Spotify Premium.':'Controlar la reproducción requiere Spotify Premium.',
+  'Muitas requisições ao Spotify. Espere um pouco.':'Demasiadas solicitudes a Spotify. Espera un poco.', 'Salvar e conectar':'Guardar y conectar', 'Copiar':'Copiar', 'Endereço copiado':'Dirección copiada',
+  'Desconectar Spotify deste aparelho':'Desconectar Spotify de este dispositivo', 'Client ID':'Client ID',
   'Fonte: kworb.net (streams do Spotify, publicados 1x por dia).':'Fuente: kworb.net (streams de Spotify, publicados 1 vez al día).',
   'Semanal e mensal são completos depois de 7 e 30 dias de coleta.':'Semanal y mensual quedan completos después de 7 y 30 días de recopilación.',
   'Como principal':'Como principal', 'Participações':'Colaboraciones', 'Subindo agora':'Subiendo ahora', 'Mais ouvidas':'Más escuchadas', 'Mais votadas':'Más votadas',
@@ -767,6 +776,7 @@ const Screens = {
     view.innerHTML = `
       <div class="top" style="margin-bottom:14px"><div style="flex:1"><span class="kicker">Ouvir</span><h1 style="font-size:28px">${greet}</h1></div>
         <button class="pill" onclick="go({type:'library'})" style="display:flex;align-items:center;gap:6px"><svg class="ln" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 4v16M10 4v16M15 5l4 15"/></svg>Biblioteca</button></div>
+      <div id="spBox"></div>
       <div class="chips" style="margin-bottom:16px">
         ${[['all','Tudo'],['music','Música'],['podcast','Podcasts'],['radio','Rádios']].map(([k,l]) => `<button class="chip ${f===k?'on':''}" data-f="${k}">${l}</button>`).join('')}
       </div>
@@ -779,6 +789,7 @@ const Screens = {
       ${f!=='podcast' && f!=='radio' ? `<h2>Álbuns mais tocados</h2><div class="shelf" id="albums">${ph(4)}</div>` : ''}
     `;
     view.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
+    spBox(alive);
 
     // recentes
     const rec = $('#recents');
@@ -2033,6 +2044,206 @@ Screens.share = async function({src}, alive){
   show(); redraw(true);
 };
 
+/* =================== SPOTIFY (sua conta: tocando agora, controles, playlists, curtidas) =================== */
+// Login com PKCE direto do app (sem servidor). Precisa de Spotify Premium para controlar a reprodução.
+// O som sai pelo app do Spotify (celular, computador, caixa de som); o Sintonia é o controle.
+const SP_SCOPES = 'user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-library-read playlist-read-private playlist-read-collaborative user-top-read';
+const spRedirect = () => location.origin + location.pathname;
+const spCid = () => store.get('spClient', null);
+const spAuth = () => store.get('spAuth', null);
+const spConnected = () => !!(spCid() && spAuth()?.refresh_token);
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const SP_LOGO = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;fill:currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.6 14.4a.6.6 0 0 1-.9.2c-2.4-1.5-5.4-1.8-9-1a.6.6 0 1 1-.3-1.2c3.9-.9 7.2-.5 9.9 1.1.3.2.4.6.3.9zm1.2-2.7a.8.8 0 0 1-1 .3c-2.7-1.7-6.9-2.2-10.1-1.2a.8.8 0 1 1-.5-1.5c3.7-1.1 8.3-.6 11.4 1.4.4.2.5.7.2 1zm.1-2.8C14.7 9 9.4 8.8 6.3 9.7a.9.9 0 1 1-.5-1.8c3.5-1.1 9.4-.9 13.1 1.3a.9.9 0 1 1-1 1.7z"/></svg>';
+
+async function spLogin(){
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  store.set('spPkce', { verifier, state });
+  location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({ response_type: 'code', client_id: spCid(), redirect_uri: spRedirect(),
+    scope: SP_SCOPES, code_challenge_method: 'S256', code_challenge: challenge, state });
+}
+async function spToken(body){
+  const r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.error || ('HTTP ' + r.status)), { code: j.error });
+  const old = spAuth() || {};
+  const a = { access_token: j.access_token, refresh_token: j.refresh_token || old.refresh_token, exp: Date.now() + ((j.expires_in || 3600) - 60) * 1000 };
+  store.set('spAuth', a);
+  return a;
+}
+// volta do login do Spotify (?code=…)
+async function spHandleRedirect(){
+  const q = new URLSearchParams(location.search);
+  if (!q.get('code') && !q.get('error')) return false;
+  const pk = store.get('spPkce', null);
+  history.replaceState(null, '', location.pathname);
+  if (q.get('error')) { toast('Conexão com o Spotify cancelada'); return true; }
+  if (!pk || pk.state !== q.get('state')) { toast('Não foi possível conectar o Spotify. Tente de novo.'); return true; }
+  try {
+    await spToken({ grant_type: 'authorization_code', code: q.get('code'), redirect_uri: spRedirect(), client_id: spCid(), code_verifier: pk.verifier });
+    try { localStorage.removeItem('spPkce'); } catch {}
+    toast('Spotify conectado');
+  } catch (e) { toast('Spotify recusou a conexão: ' + e.message); }
+  S.tab = 'home'; S.stack = [];
+  return true;
+}
+async function spApi(path, opt = {}){
+  let a = spAuth();
+  if (!a) throw Object.assign(new Error('Spotify desconectado'), { status: 401 });
+  if (Date.now() > a.exp) {
+    try { a = await spToken({ grant_type: 'refresh_token', refresh_token: a.refresh_token, client_id: spCid() }); }
+    catch (e) { if (e.code === 'invalid_grant') { try { localStorage.removeItem('spAuth'); } catch {} } throw e; }
+  }
+  const r = await fetch('https://api.spotify.com/v1' + path, { ...opt, headers: { Authorization: 'Bearer ' + a.access_token, ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (r.status === 204 || r.status === 202) return null;
+  const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch {}
+  if (r.status === 401) store.set('spAuth', { ...a, exp: 0 });
+  if (!r.ok) throw Object.assign(new Error(j?.error?.message || ('HTTP ' + r.status)), { status: r.status, reason: j?.error?.reason });
+  return j;
+}
+function spErr(e){
+  if (e.status === 403 && /premium/i.test(e.message + e.reason)) return 'Controlar a reprodução exige Spotify Premium.';
+  if (e.status === 403) return 'O Spotify recusou. Confira se sua conta está em "User Management" do app de desenvolvedor.';
+  if (e.status === 429) return 'Muitas requisições ao Spotify. Espere um pouco.';
+  return 'Spotify: ' + e.message;
+}
+// toca (ou retoma); sem aparelho ativo, usa o celular/computador com Spotify aberto
+async function spPlay(body){
+  const run = dev => spApi('/me/player/play' + (dev ? '?device_id=' + dev : ''), { method: 'PUT', body: JSON.stringify(body || {}) });
+  try { await run(); return true; }
+  catch (e) {
+    if (e.status === 404 || e.reason === 'NO_ACTIVE_DEVICE') {
+      try {
+        const d = await spApi('/me/player/devices');
+        const dev = d.devices.find(x => x.is_active) || d.devices.find(x => /smartphone/i.test(x.type)) || d.devices[0];
+        if (dev) { await run(dev.id); return true; }
+      } catch (e2) { toast(spErr(e2)); return false; }
+      toast('Abra o app do Spotify neste celular e toque de novo.');
+      setTimeout(() => { location.href = 'spotify:'; }, 600);
+      return false;
+    }
+    toast(spErr(e)); return false;
+  }
+}
+const spCmd = (path, method = 'POST') => spApi(path, { method }).catch(e => toast(spErr(e)));
+const spImg = (imgs, n = 300) => (imgs || []).slice().sort((a, b) => Math.abs((a.width || n) - n) - Math.abs((b.width || n) - n))[0]?.url || '';
+const spArtists = t => (t?.artists || []).map(a => a.name).join(', ');
+
+/* ---------- bloco na aba Ouvir ---------- */
+async function spBox(alive){
+  const box = $('#spBox'); if (!box) return;
+  if (!spConnected()) {
+    box.innerHTML = `<div class="hcard" style="gap:12px;margin-bottom:18px">
+      <div class="hd"><span style="color:#1DB954">${SP_LOGO}</span><div class="t"><b>Conecte seu Spotify</b><span class="note">Músicas completas, suas playlists e o que está tocando</span></div></div>
+      <button class="btn" id="spGo" style="height:44px;border-radius:14px">${spCid() ? 'Conectar Spotify' : 'Configurar e conectar'}</button></div>`;
+    $('#spGo').onclick = () => spCid() ? spLogin() : go({type:'spsetup'});
+    return;
+  }
+  box.innerHTML = `<div id="spNow"></div>
+    <h2 style="margin-top:6px"><span style="color:#1DB954;display:inline-flex">${SP_LOGO}</span>Suas playlists</h2><div class="shelf" id="spPl">${ph(4)}</div>
+    <h2>Curtidas no Spotify</h2><div id="spLiked">${phRows(3)}</div>
+    <h2>Mais ouvidas por você <small>últimas semanas</small></h2><div class="shelf" id="spTop">${ph(4)}</div>`;
+  const paintNow = async () => {
+    if (!alive() || !$('#spNow')) return;
+    let p = null; try { p = await spApi('/me/player?additional_types=episode'); } catch (e) { if (e.status === 401) return spBox(alive); }
+    if (!alive() || !$('#spNow')) return;
+    const it = p?.item;
+    if (!it) { $('#spNow').innerHTML = `<div class="acard" style="margin-bottom:8px"><span style="color:#1DB954">${SP_LOGO}</span><div class="t"><b>Nada tocando no Spotify</b><span class="note">Escolha uma playlist ou música abaixo</span></div><button class="pill" id="spOpen">Abrir Spotify</button></div>`;
+      $('#spOpen').onclick = () => { location.href = 'spotify:'; }; return; }
+    const pct = it.duration_ms ? Math.min(100, (p.progress_ms || 0) / it.duration_ms * 100) : 0;
+    $('#spNow').innerHTML = `<div class="hcard" style="gap:12px;margin-bottom:8px">
+      <div class="hd"><img src="${esc(spImg(it.album?.images || it.images, 120))}" alt="" style="border-radius:10px;width:56px;height:56px">
+        <div class="t"><span class="note" style="color:#1DB954;font-weight:800">${p.is_playing ? 'TOCANDO AGORA' : 'PAUSADO'}${p.device ? ' · ' + esc(p.device.name) : ''}</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.name)}</b><span class="note">${esc(spArtists(it) || it.show?.name || '')}</span></div></div>
+      <div class="prog2"><span style="width:${pct}%;background:#1DB954"></span></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px">
+        <button class="icon-btn" id="spPrev" aria-label="Anterior" style="color:var(--text)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg></button>
+        <button class="bigplay" id="spPP" aria-label="Tocar/pausar" style="margin:0;background:#1DB954;color:#000">${p.is_playing ? I.pause : I.play}</button>
+        <button class="icon-btn" id="spNext" aria-label="Próxima" style="color:var(--text)"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zm-1.5 7L5 19V5z"/></svg></button>
+      </div></div>`;
+    $('#spPrev').onclick = async () => { await spCmd('/me/player/previous'); setTimeout(paintNow, 600); };
+    $('#spNext').onclick = async () => { await spCmd('/me/player/next'); setTimeout(paintNow, 600); };
+    $('#spPP').onclick = async () => { if (p.is_playing) await spCmd('/me/player/pause', 'PUT'); else await spPlay(); setTimeout(paintNow, 600); };
+  };
+  paintNow();
+  const tick = setInterval(() => { if (!alive() || !$('#spNow')) return clearInterval(tick); paintNow(); }, 6000);
+  // playlists
+  spApi('/me/playlists?limit=30').then(r => {
+    if (!alive() || !$('#spPl')) return;
+    const pls = (r?.items || []).filter(Boolean);
+    $('#spPl').innerHTML = pls.length ? pls.map((pl, i) => `<button class="tile" data-pl="${i}"><img src="${esc(spImg(pl.images))}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'"><b>${esc(pl.name)}</b><i>${esc(pl.owner?.display_name || '')}</i></button>`).join('') : '<p class="note">Nenhuma playlist.</p>';
+    $('#spPl').onclick = e => { const b = e.target.closest('[data-pl]'); if (b) go({type:'spPlaylist', pl: pls[+b.dataset.pl]}); };
+  }).catch(e => { if ($('#spPl')) $('#spPl').innerHTML = `<p class="note">${esc(spErr(e))}</p>`; });
+  // curtidas
+  spApi('/me/tracks?limit=20').then(r => {
+    if (!alive() || !$('#spLiked')) return;
+    const tr = (r?.items || []).map(x => x.track).filter(Boolean);
+    $('#spLiked').innerHTML = tr.map((t, i) => `<button class="row" data-t="${i}"><img src="${esc(spImg(t.album?.images, 64))}" alt="" loading="lazy"><div class="t"><b>${esc(t.name)}</b><i>${esc(spArtists(t))}</i></div></button>`).join('') || '<p class="note">Nenhuma música curtida.</p>';
+    $('#spLiked').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b) return; if (await spPlay({ uris: tr.map(t => t.uri), offset: { position: +b.dataset.t } })) setTimeout(paintNow, 800); };
+  }).catch(e => { if ($('#spLiked')) $('#spLiked').innerHTML = `<p class="note">${esc(spErr(e))}</p>`; });
+  // mais ouvidas
+  spApi('/me/top/tracks?limit=15&time_range=short_term').then(r => {
+    if (!alive() || !$('#spTop')) return;
+    const tr = (r?.items || []).filter(Boolean);
+    $('#spTop').innerHTML = tr.map((t, i) => `<button class="tile" data-t="${i}"><img src="${esc(spImg(t.album?.images))}" alt="" loading="lazy"><b>${esc(t.name)}</b><i>${esc(spArtists(t))}</i></button>`).join('') || '<p class="note">Ainda sem dados.</p>';
+    $('#spTop').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b) return; if (await spPlay({ uris: tr.map(t => t.uri), offset: { position: +b.dataset.t } })) setTimeout(paintNow, 800); };
+  }).catch(e => { if ($('#spTop')) $('#spTop').innerHTML = `<p class="note">${esc(spErr(e))}</p>`; });
+}
+
+/* ---------- playlist ---------- */
+Screens.spPlaylist = async function({pl}, alive){
+  view.innerHTML = `
+    <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
+    <div class="detail-head"><img src="${esc(spImg(pl.images))}" alt=""><div style="min-width:0"><span class="k" style="color:#1DB954">PLAYLIST · SPOTIFY</span><h1>${esc(pl.name)}</h1><div class="sub">${esc(pl.owner?.display_name || '')}</div></div></div>
+    <div class="actions"><button class="bigplay" id="spAll" aria-label="Tocar playlist" style="margin:0;background:#1DB954;color:#000">${I.play}</button><button class="pill" id="spShuf">Aleatório</button></div>
+    <div id="spItems">${phRows(6)}</div>`;
+  $('#spAll').onclick = () => spPlay({ context_uri: pl.uri });
+  $('#spShuf').onclick = async () => { await spCmd('/me/player/shuffle?state=true', 'PUT'); spPlay({ context_uri: pl.uri }); };
+  try {
+    const r = await spApi(`/playlists/${pl.id}/items?limit=100`);
+    if (!alive()) return;
+    const items = (r?.items || []).map(x => x.item || x.track).filter(Boolean);
+    $('#spItems').innerHTML = items.map((t, i) => `<button class="row" data-t="${i}"><img src="${esc(spImg(t.album?.images || t.images, 64))}" alt="" loading="lazy"><div class="t"><b>${esc(t.name)}</b><i>${esc(spArtists(t) || t.show?.name || '')}</i></div></button>`).join('') || '<p class="note">Playlist vazia.</p>';
+    $('#spItems').onclick = e => { const b = e.target.closest('[data-t]'); if (b) spPlay({ context_uri: pl.uri, offset: { uri: items[+b.dataset.t].uri } }); };
+  } catch (e) {
+    if (alive()) $('#spItems').innerHTML = `<p class="note" style="line-height:1.6">O Spotify só mostra as faixas de playlists criadas por você. Esta dá para tocar inteira pelo botão acima.</p>`;
+  }
+};
+
+/* ---------- configuração (uma vez) ---------- */
+Screens.spsetup = function(){
+  const uri = spRedirect();
+  view.innerHTML = `
+    <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
+    <span class="kicker">Configuração única</span>
+    <h1 style="margin-bottom:8px">Conectar Spotify</h1>
+    <p class="sub" style="line-height:1.55;margin-bottom:16px">O Spotify pede que cada pessoa crie um "app de desenvolvedor" gratuito para usar a própria conta em apps como o Sintonia. Leva uns 5 minutos e é feito uma vez.</p>
+    <div class="kpi" style="gap:12px;margin-bottom:14px">
+      <ol style="margin:0 0 0 18px;line-height:1.65;font-size:13px;color:var(--muted)">
+        <li>Abra o <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">painel de desenvolvedor do Spotify</a> e entre com a sua conta.</li>
+        <li>Toque em <b>Create app</b>. Nome: <b>Sintonia</b>. Descrição: qualquer uma.</li>
+        <li>Em <b>Redirect URIs</b>, cole exatamente o endereço abaixo e toque em <b>Add</b>.</li>
+        <li>Em <b>Which API/SDKs are you planning to use?</b>, marque <b>Web API</b>, aceite os termos e salve.</li>
+        <li>No app criado, abra <b>Settings</b> e copie o <b>Client ID</b>. Cole aqui embaixo.</li>
+      </ol>
+      <div style="display:flex;gap:8px;align-items:center"><input class="filter" id="spUri" readonly value="${esc(uri)}" style="margin:0;font-size:12px" aria-label="Redirect URI"><button class="btn ghost" id="spCopy">Copiar</button></div>
+    </div>
+    <label for="spCid" class="note" style="font-weight:700;display:block;margin-bottom:4px">Client ID</label>
+    <input class="filter" id="spCid" autocomplete="off" placeholder="ex.: 1a2b3c…" value="${esc(spCid() || '')}" style="margin-top:0">
+    <button class="btn" id="spSave" style="width:100%;height:48px;border-radius:14px;margin-top:4px">Salvar e conectar</button>
+    ${spConnected() ? `<button class="btn ghost" id="spOut" style="width:100%;height:44px;border-radius:14px;margin-top:10px;color:var(--bad)">Desconectar Spotify deste aparelho</button>` : ''}
+    <p class="note" style="margin-top:12px;line-height:1.55">Para tocar músicas é preciso Spotify Premium. Na tela de login do Spotify, entre com e-mail e senha (o botão "Continuar com Google" pode não funcionar dentro do app).</p>
+    <p class="note" id="spMsg" style="margin-top:8px"></p>`;
+  $('#spCopy').onclick = async () => { try { await navigator.clipboard.writeText(uri); toast('Endereço copiado'); } catch { $('#spUri').select(); toast('Selecione e copie o endereço'); } };
+  $('#spSave').onclick = () => {
+    const id = $('#spCid').value.trim();
+    if (!/^[0-9a-f]{32}$/i.test(id)) { $('#spMsg').textContent = 'O Client ID tem 32 letras e números (copie do Settings do app no Spotify).'; return; }
+    store.set('spClient', id); try { localStorage.removeItem('spAuth'); } catch {}
+    spLogin();
+  };
+  if ($('#spOut')) $('#spOut').onclick = () => { try { localStorage.removeItem('spAuth'); } catch {} toast('Spotify desconectado'); back(); };
+};
+
 /* =================== CHAVE DO GITHUB (adicionar/remover artista sem abrir o GitHub) =================== */
 Screens.ghsetup = function({pending, bad}){
   const has = !!store.get(GH_KEY, null);
@@ -2253,6 +2464,7 @@ function spark(pts){
 }
 
 render();
+spHandleRedirect().then(done => { if (done) render(); });
 </script>
 </body>
 </html>

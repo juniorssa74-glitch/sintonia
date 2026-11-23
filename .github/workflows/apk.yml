@@ -35,7 +35,7 @@ jobs:
           OWNER_LC=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           URL="https://${OWNER_LC}.github.io/${REPO}/"
           echo "O app vai abrir: $URL"
-          node -e "const f='capacitor.config.json';const c=require('./'+f);c.server.url=process.argv[1];c.server.allowNavigation=[new URL(process.argv[1]).host];require('fs').writeFileSync(f,JSON.stringify(c,null,2))" "$URL"
+          node -e "const f='capacitor.config.json';const c=require('./'+f);c.server.url=process.argv[1];c.server.allowNavigation=[new URL(process.argv[1]).host,'accounts.spotify.com','*.spotify.com','*.scdn.co','challenge.spotify.com'];require('fs').writeFileSync(f,JSON.stringify(c,null,2))" "$URL"
           npm install
           npx cap add android
           (npm run icon && npx capacitor-assets generate --android) || echo "usando ícone padrão"
