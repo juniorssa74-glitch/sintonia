@@ -613,15 +613,12 @@ const Screens = {
         <div class="t"><b>Curtidas</b><i>Playlist · ${liked.length} ${liked.length===1?'item':'itens'}</i></div></button>
       <button class="row" id="localRow"><div style="width:48px;height:48px;border-radius:6px;background:linear-gradient(135deg,#1d8a42,#0d3b1e);display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg></div>
         <div class="t"><b>Músicas do celular</b><i>Arquivos de áudio do aparelho · sem áudios do WhatsApp</i></div></button>
-      <button class="row" id="spcRow"><div style="width:48px;height:48px;border-radius:6px;background:linear-gradient(135deg,#3ddc6f,#0b5a2a);display:grid;place-items:center;flex:none"><svg viewBox="0 0 24 24"><path d="M4 20V10h3v10H4zm6 0V4h3v16h-3zm6 0v-7h3v7h-3z"/></svg></div>
-        <div class="t"><b>Spotify Charts</b><i>Importar CSV baixado da sua conta</i></div></button>
       <h2>Podcasts que você segue</h2>
       <div id="follows">${S.follows.length ? S.follows.map((p,i) => `<button class="row" data-i="${i}">${img(p.art)}<div class="t"><b>${esc(p.title)}</b><i>Podcast · ${esc(p.sub)}</i></div></button>`).join('') : '<p class="empty">Siga um podcast para ver novos episódios aqui.</p>'}</div>
       <h2>Tocados recentemente</h2>
       <div id="recs">${S.recents.length ? S.recents.map((r,i) => `<button class="row" data-r="${i}">${img(r.art)}<div class="t"><b>${esc(r.title)}</b><i>${{radio:'Rádio ao vivo',album:'Álbum',podcast:'Podcast'}[r.type]||''}</i></div></button>`).join('') : '<p class="empty">Nada por aqui ainda.</p>'}</div>`;
     $('#likedRow').onclick = () => go({type:'liked'});
     $('#localRow').onclick = () => go({type:'local'});
-    $('#spcRow').onclick = () => go({type:'spcharts'});
     $('#follows').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:S.follows[+b.dataset.i].id}); };
     $('#recs').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
       if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
@@ -1034,7 +1031,6 @@ Object.assign(Screens, {
         ${kpis(d.stats)}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
         ${chartsBlock(d, isAlbum)}
-        ${spcBlock(id)}
         ${isAlbum ? tracksBlock(d) : ''}`;
       bindSeg(paint);
       bindCharts(d);
@@ -1449,145 +1445,6 @@ Screens.share = function({src}, alive){
   };
   label(); redraw(true);
 };
-
-/* =================== SPOTIFY CHARTS (CSV importado pelo usuário) =================== */
-// O usuário baixa o CSV logado em charts.spotify.com ("Download CSV") e importa aqui.
-// Fica salvo só neste aparelho (localStorage).
-const SPC_KEY = 'spCharts', SPC_MAX = 120;
-const spcAll = () => store.get(SPC_KEY, []);
-function spcSave(list){
-  list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.name.localeCompare(b.name));
-  try { localStorage.setItem(SPC_KEY, JSON.stringify(list.slice(0, SPC_MAX))); return true; }
-  catch { toast('Sem espaço: apague alguns charts antigos'); return false; }
-}
-function parseCSV(text){
-  const rows = []; let row = [], f = '', q = false;
-  text = text.replace(/^﻿/, '');
-  for (let i = 0; i < text.length; i++){
-    const c = text[i];
-    if (q){ if (c === '"'){ if (text[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
-    else if (c === '"') q = true;
-    else if (c === ',') { row.push(f); f = ''; }
-    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i+1] === '\n') i++; row.push(f); f = ''; if (row.some(x => x !== '')) rows.push(row); row = []; }
-    else f += c;
-  }
-  row.push(f); if (row.some(x => x !== '')) rows.push(row);
-  return rows;
-}
-const SPC_PERIOD = {daily:'Diário', weekly:'Semanal'};
-const SPC_KIND = {regional:'Top músicas', viral:'Viral', city:'Cidade', album:'Top álbuns', artist:'Top artistas'};
-function spcMeta(fileName){
-  const base = fileName.replace(/\.csv$/i, '');
-  const m = base.match(/^([a-z]+)-(.+)-(daily|weekly)-(\d{4}-\d{2}-\d{2})$/i);
-  if (!m) return { id: base, name: base, date: null };
-  let [, kind, where, per, date] = m; kind = kind.toLowerCase();
-  // ex.: regional-br-daily, regional-global-weekly, viral-br-daily, city-saopaulo-weekly, album-br-weekly…
-  if (kind === 'regional' && /-album$/.test(where)) { kind = 'album'; where = where.replace(/-album$/, ''); }
-  const place = where === 'global' ? 'Global' : where.length === 2 ? regionName(where, where.toUpperCase()) : where.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  return { id: base, date, cc: where.length === 2 ? where : where === 'global' ? 'global' : '', name: `${SPC_KIND[kind] || kind} · ${place} · ${SPC_PERIOD[per.toLowerCase()] || per}` };
-}
-function spcParse(text, fileName){
-  const rows = parseCSV(text);
-  const hi = rows.findIndex(r => r.map(x => x.trim().toLowerCase()).includes('rank'));
-  if (hi < 0) throw new Error('não parece um CSV do Spotify Charts (sem coluna "rank")');
-  const H = rows[hi].map(x => x.trim().toLowerCase()), col = (...n) => n.map(x => H.indexOf(x)).find(i => i >= 0) ?? -1;
-  const c = { rank: col('rank'), uri: col('uri'), artist: col('artist_names', 'artist_name'), title: col('track_name', 'album_name', 'name', 'artist_name'),
-              prev: col('previous_rank'), peak: col('peak_rank'), days: col('days_on_chart', 'weeks_on_chart'), streams: col('streams') };
-  const weeks = H.includes('weeks_on_chart');
-  const n = v => { const x = parseInt(String(v ?? '').replace(/[^\d-]/g, ''), 10); return isNaN(x) ? null : x; };
-  const data = rows.slice(hi + 1).filter(r => n(r[c.rank]) != null).map(r => {
-    const uri = c.uri >= 0 ? r[c.uri] || '' : '';
-    const id = (uri.match(/[A-Za-z0-9]{22}$/) || [])[0] || null;
-    return [n(r[c.rank]), id, c.artist >= 0 ? r[c.artist] : '', c.title >= 0 ? r[c.title] : '', n(r[c.prev]), n(r[c.peak]), n(r[c.days]), n(r[c.streams])];
-  });
-  if (!data.length) throw new Error('CSV sem linhas');
-  return { ...spcMeta(fileName), weeks, hasStreams: c.streams >= 0, importedAt: new Date().toISOString(), rows: data };
-}
-async function spcImport(files){
-  const list = spcAll(); let ok = 0;
-  for (const f of files){
-    try {
-      const ch = spcParse(await f.text(), f.name);
-      const i = list.findIndex(x => x.id === ch.id);
-      if (i >= 0) list[i] = ch; else list.push(ch);
-      ok++;
-    } catch (e) { toast(`${f.name}: ${e.message}`); }
-  }
-  if (ok && spcSave(list)) toast(`${ok} ${ok === 1 ? 'chart importado' : 'charts importados'}`);
-}
-const trackedNames = () => (S._summary?.artists || []).map(a => norm(a.name));
-const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const isTrackedRow = (r, names) => names.length && norm(r[2]).split(/,\s*/).some(a => names.includes(a.trim()));
-function rankMove(rank, prev){
-  if (prev == null || prev <= 0) return '<span class="d ne">novo</span>';
-  const d = prev - rank;
-  return d > 0 ? `<span class="d up">▲ ${d}</span>` : d < 0 ? `<span class="d down">▼ ${-d}</span>` : '<span class="d eq">=</span>';
-}
-const fmtDay = d => d ? new Date(d + 'T12:00:00Z').toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) : '';
-
-Screens.spcharts = async function(_, alive){
-  if (!S._summary) { try { S._summary = await dataJSON('summary.json'); } catch {} }
-  if (!alive()) return;
-  const list = spcAll();
-  view.innerHTML = `
-    <button class="back" onclick="back()">${I.back}</button>
-    <h1>Spotify Charts</h1>
-    <div class="sub" style="margin:4px 0 12px">CSVs que você baixou em charts.spotify.com · salvos só neste aparelho</div>
-    <div class="actions" style="flex-wrap:wrap">
-      <label class="btn" style="cursor:pointer">Importar CSV<input type="file" id="spcf" accept=".csv,text/csv,text/comma-separated-values,application/vnd.ms-excel" multiple hidden></label>
-      <a class="pill" href="https://charts.spotify.com/charts/overview/global" target="_blank" rel="noopener">Abrir Spotify Charts</a>
-    </div>
-    <div id="spcl">${list.length ? list.map(c => `
-      <div class="row" style="gap:10px">
-        <button class="t" data-open="${esc(c.id)}" style="flex:1;text-align:left;min-width:0"><b>${esc(c.name)}</b><i>${c.date ? fmtDay(c.date) + ' · ' : ''}${c.rows.length} posições</i></button>
-        <button class="pill" data-del="${esc(c.id)}" aria-label="Apagar">Apagar</button>
-      </div>`).join('') : `<p class="empty" style="text-align:left">Como usar: em charts.spotify.com, abra um chart (ex.: Top Songs Brasil, diário), toque em <b>Download CSV</b> e depois em <b>Importar CSV</b> aqui. Pode escolher vários arquivos de uma vez.</p>`}</div>`;
-  $('#spcf').onchange = async e => { await spcImport([...e.target.files]); render(); };
-  $('#spcl').onclick = e => {
-    const o = e.target.closest('[data-open]'); if (o) return go({type:'spchart', id:o.dataset.open});
-    const d = e.target.closest('[data-del]'); if (d && confirm('Apagar este chart do aparelho?')) { spcSave(spcAll().filter(x => x.id !== d.dataset.del)); render(); }
-  };
-};
-
-Screens.spchart = async function({id}){
-  const c = spcAll().find(x => x.id === id);
-  if (!c) { back(); return; }
-  if (!S._summary) { try { S._summary = await dataJSON('summary.json'); } catch {} }
-  const names = trackedNames();
-  let mine = false, q = '';
-  const paint = () => {
-    const rows = c.rows.filter(r => (!mine || isTrackedRow(r, names)) && (!q || norm(r[2] + ' ' + r[3]).includes(norm(q))));
-    $('#spr').innerHTML = rows.map(r => `
-      <div class="crow" style="grid-template-columns:34px 1fr 64px 46px;${isTrackedRow(r, names) ? 'background:color-mix(in srgb, var(--accent) 12%, transparent);' : ''}">
-        <span class="pos" style="text-align:left">#${r[0]}</span>
-        <span style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r[3] || r[2])}</b><i style="display:block;font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r[3] ? r[2] : '')}${r[5] ? ` · pico #${r[5]}` : ''}${r[6] ? ` · ${r[6]} ${c.weeks ? 'sem.' : 'dias'}` : ''}</i></span>
-        <span class="pos" style="font-weight:600;font-size:12px">${r[7] != null ? nf.format(r[7]) : ''}</span>
-        ${rankMove(r[0], r[4])}
-      </div>`).join('') || '<p class="empty">Nada encontrado.</p>';
-  };
-  view.innerHTML = `
-    <button class="back" onclick="back()">${I.back}</button>
-    <h1 style="font-size:24px">${esc(c.name)}</h1>
-    <div class="sub" style="margin:4px 0 12px">${c.date ? fmtDay(c.date) + ' · ' : ''}${c.rows.length} posições · importado do Spotify Charts</div>
-    <div class="chips" style="margin-bottom:8px"><button class="chip on" id="all">Todos</button><button class="chip" id="mine" ${names.length ? '' : 'disabled'}>Artistas que acompanho</button></div>
-    <input class="filter" id="spq" placeholder="Filtrar por música ou artista…">
-    <div class="crow thead" style="grid-template-columns:34px 1fr 64px 46px;font-size:11px;color:var(--muted);font-weight:700"><span>#</span><span>Música</span><span class="pos" style="font-weight:700">${c.hasStreams ? 'Streams' : ''}</span><span class="d">Mov.</span></div>
-    <div id="spr"></div>`;
-  const setMine = v => { mine = v; $('#all').classList.toggle('on', !v); $('#mine').classList.toggle('on', v); paint(); };
-  $('#all').onclick = () => setMine(false); $('#mine').onclick = () => setMine(true);
-  $('#spq').oninput = e => { q = e.target.value; paint(); };
-  paint();
-};
-
-// na página da música/álbum: posições nos CSVs importados (casando pelo ID do Spotify)
-function spcBlock(id){
-  const hits = spcAll().map(c => ({c, r: c.rows.find(r => r[1] === id)})).filter(x => x.r);
-  if (!hits.length) return '';
-  return `<h2>Spotify Charts <small>seus CSVs</small></h2>
-    ${hits.map(({c, r}) => `<div class="crow" style="grid-template-columns:1fr 46px 70px 46px">
-      <span style="min-width:0"><b style="display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</b><i style="display:block;font-style:normal;font-size:11px;color:var(--muted)">${fmtDay(c.date)}${r[5] ? ` · pico #${r[5]}` : ''}</i></span>
-      <span class="pos">#${r[0]}</span><span class="pos" style="font-weight:600;font-size:12px">${r[7] != null ? nf.format(r[7]) : ''}</span>${rankMove(r[0], r[4])}</div>`).join('')}`;
-}
 
 /* =================== MÚSICAS DO CELULAR =================== */
 // No APK: plugin nativo "LocalAudio" lista os áudios do aparelho (MediaStore), já sem WhatsApp.
