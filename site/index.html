@@ -1960,7 +1960,7 @@ function drawTable2(canvas, src, o, R){
   const ug = ctx.createLinearGradient(rx, 0, rx + tw, 0); ug.addColorStop(0, ACC); ug.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = ug; rr(ctx, rx, cy + 74, tw, 5, 2.5); ctx.fill();
   const dd = src.lastDate ? new Date(src.lastDate + 'T12:00:00Z') : null;
-  const dtxt = dd ? `${dd.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})} • ${dd.toLocaleDateString('en-US', {weekday:'long'})}`.toUpperCase() : '';
+  const dtxt = dd ? dd.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'}).toUpperCase() : '';
   ctx.strokeStyle = MUT; ctx.lineWidth = 2; ctx.strokeRect(rx + 1, cy + 104, 20, 18); ctx.fillStyle = MUT; ctx.fillRect(rx + 1, cy + 104, 20, 5);
   ctx.font = `600 22px ${FONT}`; ctx.fillText(dtxt, rx + 34, cy + 122);
 
