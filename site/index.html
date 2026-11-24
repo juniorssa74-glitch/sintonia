@@ -1333,7 +1333,7 @@ Object.assign(Screens, {
             <div class="v">${s.fresh ? '<span class="chb" style="margin:0">Novo</span>' : `<b>${fmtN(s.stats[p].value)}</b>${chg(s.stats[p].change)}`}</div>
           </button>`).join('');
       }).catch(() => {});
-      $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
+      $('#foot').innerHTML = `Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
         ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
     } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
   },
@@ -1498,10 +1498,7 @@ function chartsInner(c, isAlbum){
       <label class="csearch">${I.search || ''}<input id="cq" type="search" placeholder="Buscar país" value="${esc(chartQ)}" autocomplete="off" aria-label="Buscar país"></label>
       <button class="btn ghost" id="cimg" aria-label="Criar imagem dos charts">${I.img}Imagem</button>
     </div>
-    <div id="clist">${chartList(c)}</div>
-    <p class="note" style="margin-top:6px">${isAlbum ? 'Charts de álbuns' : 'Charts de músicas'} por país (Spotify: ${isAlbum ? 'semanal' : 'diário'}; Apple Music e iTunes: atualizados ao longo do dia). Fonte: kworb.net, coletado de hora em hora.</p>
-    ${chartSvc === 'spotify' && !isAlbum ? '<p class="note">Streams: quantos streams a música teve no dia do chart, em cada país.</p>' : ''}
-    ${chartSvc === 'itunesLatin' ? '<p class="note">iTunes Latin: chart do gênero latino do iTunes em cada país. Fonte: LivePopBars, coletado de hora em hora.</p>' : ''}`;
+    <div id="clist">${chartList(c)}</div>`;
 }
 function bindCharts(d){
   const box = $('#chartsBox'); if (!box || !$('#csvc')) return;
