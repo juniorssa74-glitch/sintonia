@@ -1,0 +1,43 @@
+# Relógio da coleta: o agendamento do GitHub ("cron") atrasa e pula muitas execuções.
+# Este relógio fica rodando e dispara a coleta (update.yml) a cada 20 minutos, para
+# Apple Music, iTunes e iTunes Latin ficarem em dia. Depois de ~5h40 ele se religa sozinho.
+# O agendamento abaixo é só reserva: religa o relógio se ele parar por algum motivo.
+name: Relógio da coleta (20 min)
+
+on:
+  schedule:
+    - cron: "7 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+# só um relógio por vez (um novo espera o atual terminar)
+concurrency:
+  group: relogio
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Disparar a coleta a cada 20 minutos
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          end=$(( $(date +%s) + 340 * 60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            echo "$(date -u +%H:%M) UTC: disparando a coleta"
+            gh workflow run update.yml --repo "$REPO" --ref main || echo "não consegui disparar agora; tento de novo em 20 min"
+            sleep 1200
+          done
+
+      - name: Religar o relógio
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh workflow run relogio.yml --repo "$REPO" --ref main
