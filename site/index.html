@@ -549,6 +549,7 @@ const ES = {
   'Seguir':'Seguir', 'Seguindo':'Siguiendo', 'Podcast':'Podcast', 'Episódio':'Episodio', 'Rádio ao vivo':'Radio en vivo', 'No celular':'En el celular',
   'Qual é o seu artista favorito?':'¿Cuál es tu artista favorito?', 'Continuar':'Continuar', 'Trocar':'Cambiar', 'Seu artista':'Tu artista', 'Escolha um artista':'Elige un artista',
   'Dá para trocar depois, no botão Trocar da aba Streams.':'Puedes cambiarlo después con el botón Cambiar de la pestaña Streams.',
+  'Modo administrador ligado':'Modo administrador activado', 'Modo administrador desligado':'Modo administrador desactivado',
   'Baixar o app Sintonia':'Descargar la app Sintonia', 'Só funciona em Android · não funciona em iPhone':'Solo funciona en Android · no funciona en iPhone', 'Baixar':'Descargar',
   'Lançamento · streams em breve':'Lanzamiento · streams pronto', 'Novo':'Nuevo', 'LANÇAMENTO':'LANZAMIENTO', 'Streams em breve':'Streams pronto',
   'A música já está nos charts, mas ainda não aparece na lista de streams do Spotify do kworb, que costuma incluir lançamentos alguns dias depois. Quando entrar, os números aparecem aqui sozinhos.':'La canción ya está en los charts, pero aún no aparece en la lista de streams de Spotify de kworb, que suele incluir los lanzamientos unos días después. Cuando entre, los números aparecerán aquí solos.',
@@ -1101,6 +1102,10 @@ const toSeries = arr => arr.map(([date, t, d]) => ({date, t, d}));
 // Com a chave do GitHub salva no aparelho, o app cria a issue sozinho (sem abrir o GitHub).
 let REPO = null;
 const GH_KEY = 'ghToken';
+// links de administração só no aparelho do dono: tem a chave do GitHub salva ou abriu o site uma vez com ?admin
+// (só esconde os links; o GitHub continua exigindo login/chave para rodar qualquer coisa)
+if (/[?&]admin\b/.test(location.search)) { try { localStorage.setItem('admin', '1'); } catch {} }
+const isAdmin = () => { try { return !!localStorage.getItem('admin') || !!store.get(GH_KEY, null); } catch { return false; } };
 async function issueLink(action, id, name){
   if (!REPO) { toast('Disponível na versão online (GitHub)'); return; }
   const title = `${action} ${id}: ${name}`;
@@ -1293,7 +1298,13 @@ Object.assign(Screens, {
           </button>`).join('');
       }).catch(() => {});
       $('#foot').innerHTML = `Atualizado em ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}<br>
-        ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
+        ${REPO && isAdmin() ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
+      // 5 toques em "Atualizado em" liga/desliga o modo administrador neste aparelho (útil no APK)
+      let taps = 0, tt;
+      $('#foot').onclick = e => { if (e.target.closest('a')) return; clearTimeout(tt); tt = setTimeout(() => taps = 0, 2000);
+        if (++taps < 5) return; taps = 0; const on = !localStorage.getItem('admin');
+        try { on ? localStorage.setItem('admin', '1') : localStorage.removeItem('admin'); } catch {}
+        toast(on ? 'Modo administrador ligado' : 'Modo administrador desligado'); render(); };
     } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
   },
 
