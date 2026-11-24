@@ -832,68 +832,8 @@ function bindSongRows(root, list, from){
 
 /* ---------- telas ---------- */
 const Screens = {
-  async home(_, alive){
-    const hour = new Date().getHours();
-    const greet = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-    const f = S.filter;
-    view.innerHTML = `
-      <div class="top" style="margin-bottom:14px"><div style="flex:1"><span class="kicker">Ouvir</span><h1 style="font-size:28px">${greet}</h1></div>
-        <button class="pill" onclick="go({type:'library'})" style="display:flex;align-items:center;gap:6px"><svg class="ln" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M5 4v16M10 4v16M15 5l4 15"/></svg>Biblioteca</button></div>
-      <div id="spBox"></div>
-      <div class="chips" style="margin-bottom:16px">
-        ${[['all','Tudo'],['music','Música'],['podcast','Podcasts'],['radio','Rádios']].map(([k,l]) => `<button class="chip ${f===k?'on':''}" data-f="${k}">${l}</button>`).join('')}
-      </div>
-      <div class="livebar"><span class="dot"></span><span>Dados ao vivo · <span id="upd">carregando…</span></span></div>
-      ${S.recents.length && f==='all' ? `<div class="recents" id="recents"></div>` : ''}
-      ${f!=='podcast' && f!=='radio' ? `<h2>Em alta no Brasil <small>Apple Music</small></h2><div class="shelf" id="top">${ph(4)}</div>` : ''}
-      ${f!=='music' && f!=='podcast' ? `<h2><span class="dot"></span>Rádios bombando agora <small>atualiza a cada 30s</small></h2><div class="shelf" id="radios">${ph(4)}</div>` : ''}
-      ${f!=='music' && f!=='radio' ? `<h2>Escolhido pra você</h2><div id="pick"><div class="feature"><div class="ph" style="width:120px;height:120px;border-radius:8px"></div></div></div>
-        <h2>Podcasts mais ouvidos</h2><div class="shelf" id="pods">${ph(4)}</div>` : ''}
-      ${f!=='podcast' && f!=='radio' ? `<h2>Álbuns mais tocados</h2><div class="shelf" id="albums">${ph(4)}</div>` : ''}
-    `;
-    view.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.filter = b.dataset.f; render(); });
-    spBox(alive);
-
-    // recentes
-    const rec = $('#recents');
-    if (rec) {
-      rec.innerHTML = S.recents.slice(0,6).map((r,i) => `<button class="rc" data-r="${i}">${img(r.art)}<span>${esc(r.title)}</span></button>`).join('');
-      rec.onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const r = S.recents[+b.dataset.r];
-        if (r.type==='radio') playQueue([r.item], 0, 'Rádio ao vivo'); else go({type:r.type, id:r.id}); };
-    }
-
-    // músicas em alta
-    if ($('#top')) API.topSongs().then(list => {
-      if (!alive() || !$('#top')) return;
-      const items = list.map(songItem);
-      $('#top').innerHTML = items.map((s,i) => `<button class="tile" data-i="${i}">${img(s.art)}<b data-pid="${s.id}" class="${S.cur?.id===s.id?'playing':''}">${i+1}. ${esc(s.title)}</b><i>${esc(s.sub)}</i></button>`).join('');
-      $('#top').onclick = e => { const b = e.target.closest('[data-i]'); if (b) playQueue(items, +b.dataset.i, 'Em alta no Brasil'); };
-    }).catch(() => alive() && $('#top') && ($('#top').innerHTML = '<p class="err">Não foi possível carregar as paradas agora.</p>'));
-
-    if ($('#radios')) loadRadios(alive);
-
-    if ($('#pods')) API.topPodcasts().then(list => {
-      if (!alive() || !$('#pods')) return;
-      $('#pods').innerHTML = list.map((p,i) => `<button class="tile" data-i="${i}">${img(big(p.artworkUrl100,400))}<b>${esc(p.collectionName)}</b><i>${esc(p.artistName)}</i></button>`).join('');
-      $('#pods').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'podcast', id:list[+b.dataset.i].collectionId}); };
-      // destaque: um podcast aleatório do top + último episódio
-      const p = list[Math.floor(Math.random()*Math.min(10, list.length))];
-      if (p) API.lookup({id:p.collectionId, entity:'podcastEpisode', limit:2}).then(res => {
-        if (!alive() || !$('#pick')) return;
-        const ep = res.find(r => r.kind === 'podcast-episode' || r.wrapperType === 'podcastEpisode');
-        if (!ep) { $('#pick').remove(); return; }
-        const item = episodeItem(ep, p);
-        $('#pick').innerHTML = `<button class="feature">${img(big(p.artworkUrl100,400))}<div class="meta"><span class="k">Podcast · Episódio mais recente</span><b>${esc(item.title)}</b><span class="k">${esc(p.collectionName)}</span><p>${esc(item.desc||'')}</p></div></button>`;
-        $('#pick').onclick = () => go({type:'podcast', id:p.collectionId});
-      }).catch(()=>{});
-    }).catch(() => alive() && $('#pods') && ($('#pods').innerHTML = '<p class="err">Não foi possível carregar os podcasts.</p>'));
-
-    if ($('#albums')) API.topAlbums().then(list => {
-      if (!alive() || !$('#albums')) return;
-      $('#albums').innerHTML = list.map((a,i) => `<button class="tile" data-i="${i}">${img(big(a.artworkUrl100,400))}<b>${esc(a.collectionName)}</b><i>${esc(a.artistName)}</i></button>`).join('');
-      $('#albums').onclick = e => { const b = e.target.closest('[data-i]'); if (b) go({type:'album', id:list[+b.dataset.i].collectionId}); };
-    }).catch(() => {});
-  },
+  // aba Ouvir: só a biblioteca (curtidas, músicas do celular, podcasts seguidos, recentes)
+  home(){ return Screens.library(); },
 
   async search(_, alive){
     const cats = [
