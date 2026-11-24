@@ -177,6 +177,8 @@ a.pill{text-decoration:none;display:inline-block}
 .hcard .num strong{display:block;font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1}
 .prog2{height:6px;border-radius:3px;background:var(--card2);overflow:hidden}
 .prog2 span{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.lgain{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.lgain div{background:var(--bg2);border-radius:14px;padding:9px 10px}.lgain div.on{box-shadow:inset 0 0 0 2px var(--accent-soft)}.lgain span{display:block;font-size:11px;color:var(--muted);font-weight:700}.lgain b{display:block;font-size:16px;font-weight:800;margin-top:2px}.lgain i{display:block;font-style:normal;font-size:10px;color:var(--muted)}
+.ldays{margin-top:12px;font-size:13px}.lrow{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}.lrow span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}.lrow.lh{font-size:11px;color:var(--muted);font-weight:700}.lrow span.up,.lrow span.down{font-weight:700}
 .badge2{padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap}
 .badge2.down{background:var(--bad-soft);color:var(--bad)} .badge2.up{background:var(--accent-soft);color:var(--good)}
 .dlapp{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:22px;padding:14px 16px;margin-top:16px;box-shadow:var(--shadow);color:var(--text);text-decoration:none}
@@ -549,6 +551,7 @@ const ES = {
   'Seguir':'Seguir', 'Seguindo':'Siguiendo', 'Podcast':'Podcast', 'Episódio':'Episodio', 'Rádio ao vivo':'Radio en vivo', 'No celular':'En el celular',
   'Qual é o seu artista favorito?':'¿Cuál es tu artista favorito?', 'Continuar':'Continuar', 'Trocar':'Cambiar', 'Seu artista':'Tu artista', 'Escolha um artista':'Elige un artista',
   'Dá para trocar depois, no botão Trocar da aba Streams.':'Puedes cambiarlo después con el botón Cambiar de la pestaña Streams.',
+  'Ganho':'Ganancia', 'Ouvintes':'Oyentes', 'O gráfico do ganho diário aparece a partir do 2º dia de coleta.':'El gráfico de la ganancia diaria aparece a partir del 2.º día de recopilación.',
   'Modo administrador ligado':'Modo administrador activado', 'Modo administrador desligado':'Modo administrador desactivado',
   'Baixar o app Sintonia':'Descargar la app Sintonia', 'Só funciona em Android · não funciona em iPhone':'Solo funciona en Android · no funciona en iPhone', 'Baixar':'Descargar',
   'Lançamento · streams em breve':'Lanzamiento · streams pronto', 'Novo':'Nuevo', 'LANÇAMENTO':'LANZAMIENTO', 'Streams em breve':'Streams pronto',
@@ -558,6 +561,7 @@ const ES = {
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
   [/^Atualizado em ([\d\/]+, [\d:]+)$/, 'Actualizado el $1'],
+  [/^(\d+) de (\d+) dias$/, '$1 de $2 días'],
   [/^Só as faixas deste álbum: as de (.+), que vêm junto no Spotify e na Apple, ficam de fora da lista e dos números.$/, 'Solo las canciones de este álbum: las de $1, que vienen incluidas en Spotify y Apple, quedan fuera de la lista y de los números.'],
   [/^(\d+) (faixa|faixas) em (\d+) (país|países) · chart diário de músicas$/, (m, a, f, b, p) => `${a} ${a === '1' ? 'canción' : 'canciones'} en ${b} ${p} · chart diario de canciones`],
   [/^(\d+) (país|países) · melhor #(\d+) em (.+)$/, '$1 $2 · mejor #$3 en $4'],
@@ -1206,19 +1210,32 @@ function kpis(st){
 const lstChg = v => v == null ? '' : `<span class="badge2 ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '▲' : '▼'} ${nf.format(Math.abs(v))}</span>`;
 function listenersCard(L){
   if (!L) return '';
-  const s = L.series || [];
-  let spark = `<p class="note" style="margin-top:10px">O gráfico aparece a partir do 2º dia de coleta.</p>`;
-  if (s.length > 1) {
-    const W = 320, H = 56, vs = s.map(x => x[1]), mn = Math.min(...vs), mx = Math.max(...vs), rg = mx - mn || 1;
-    const pts = vs.map((v, i) => `${(i/(vs.length-1)*W).toFixed(1)},${(H - 4 - (v-mn)/rg*(H-8)).toFixed(1)}`).join(' ');
-    spark = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:56px;margin-top:12px" role="img" aria-label="Ouvintes mensais nos últimos ${s.length} dias"><polyline points="${pts}" fill="none" stroke="var(--viz)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
-      <div class="note" style="display:flex;justify-content:space-between"><span>${fmtDate(s[0][0])}</span><span>${fmtDate(s[s.length-1][0])}</span></div>`;
+  const s = L.series || [], G = L.gain;
+  const sg = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf.format(Math.abs(v));
+  const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+  // ganho de ouvintes: hoje, 7 dias e mês do calendário (mesma lógica dos streams)
+  const tiles = G ? `<div class="lgain">${[['day','Hoje'],['week','7 dias'],['month','No mês']].map(([k, lab]) => { const g = G[k];
+      return `<div class="${S.period === k ? 'on' : ''}"><span>${lab}</span><b class="${cls(g.value)}">${sg(g.value)}</b>${k !== 'day' && g.covered < g.days ? `<i>${g.covered} de ${g.days} dias</i>` : ''}</div>`; }).join('')}</div>` : '';
+  // barras do ganho diário (verde subiu, vermelho caiu), últimos 30 dias
+  const gs = s.filter(x => x[2] != null).slice(-30);
+  let bars = `<p class="note" style="margin-top:10px">O gráfico do ganho diário aparece a partir do 2º dia de coleta.</p>`;
+  if (gs.length > 1) {
+    const W = 320, H = 70, mid = H / 2, mx = Math.max(1, ...gs.map(x => Math.abs(x[2]))), bw = W / Math.max(gs.length, 7);
+    bars = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:70px;margin-top:12px" role="img" aria-label="Ganho de ouvintes por dia">
+      <line x1="0" x2="${W}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1"/>
+      ${gs.map((x, i) => { const h = Math.max(1.5, Math.abs(x[2]) / mx * (mid - 3)), y = x[2] >= 0 ? mid - h : mid;
+        return `<rect x="${(i * bw + 1).toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(2, bw - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${x[2] >= 0 ? 'var(--good)' : 'var(--bad)'}"><title>${fmtDate(x[0])}: ${sg(x[2])}</title></rect>`; }).join('')}
+      </svg><div class="note" style="display:flex;justify-content:space-between"><span>${fmtDate(gs[0][0])}</span><span>${fmtDate(gs[gs.length-1][0])}</span></div>`;
   }
+  // dia a dia: data, ouvintes e ganho (últimos 14 dias)
+  const rows = s.slice().reverse().slice(0, 14);
+  const list = rows.length ? `<div class="ldays"><div class="lrow lh"><span>Dia</span><span>Ouvintes</span><span>Ganho</span></div>
+    ${rows.map(x => `<div class="lrow"><span>${fmtDate(x[0])}</span><span>${nf.format(x[1])}</span><span class="${cls(x[2])}">${sg(x[2])}</span></div>`).join('')}</div>` : '';
   const meta = [L.rank ? `#${L.rank} no mundo` : '', L.peak ? `pico ${fmtN(L.peak)}${L.peakRank ? ` (#${L.peakRank})` : ''}` : ''].filter(Boolean).join(' · ');
   return `<div class="chart"><h3>Ouvintes mensais</h3>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">
       <b style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">${nf.format(L.value)}</b>${lstChg(L.change)}</div>
-    ${meta ? `<p class="note" style="margin-top:8px">${meta}</p>` : ''}${spark}</div>`;
+    ${meta ? `<p class="note" style="margin-top:8px">${meta}</p>` : ''}${tiles}${bars}${list}</div>`;
 }
 const badge = c => c == null ? '' : `<span class="badge2 ${c >= 0 ? 'up' : 'down'}">${c >= 0 ? '▲' : '▼'} ${Math.abs(c*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</span>`;
 
