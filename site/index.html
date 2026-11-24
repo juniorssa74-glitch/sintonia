@@ -533,6 +533,7 @@ const ES = {
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
 const ES_RULES = [
+  [/^Atualizado em ([\d\/]+, [\d:]+)$/, 'Actualizado el $1'],
   [/^Só as faixas deste álbum: as de (.+), que vêm junto no Spotify e na Apple, ficam de fora da lista e dos números.$/, 'Solo las canciones de este álbum: las de $1, que vienen incluidas en Spotify y Apple, quedan fuera de la lista y de los números.'],
   [/^(\d+) (faixa|faixas) em (\d+) (país|países) · chart diário de músicas$/, (m, a, f, b, p) => `${a} ${a === '1' ? 'canción' : 'canciones'} en ${b} ${p} · chart diario de canciones`],
   [/^(\d+) (país|países) · melhor #(\d+) em (.+)$/, '$1 $2 · mejor #$3 en $4'],
@@ -1333,7 +1334,7 @@ Object.assign(Screens, {
             <div class="v">${s.fresh ? '<span class="chb" style="margin:0">Novo</span>' : `<b>${fmtN(s.stats[p].value)}</b>${chg(s.stats[p].change)}`}</div>
           </button>`).join('');
       }).catch(() => {});
-      $('#foot').innerHTML = `Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
+      $('#foot').innerHTML = `Atualizado em ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}<br>
         ${REPO ? `<a style="color:var(--accent);font-weight:700" href="https://github.com/${REPO}/actions/workflows/update.yml" target="_blank" rel="noopener">Rodar coleta agora</a> · <a href="#" style="color:var(--accent);font-weight:700" onclick="go({type:'ghsetup'});return false">Chave do GitHub</a>` : ''}`;
     } catch { if (alive()) $('#alist').innerHTML = '<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>'; }
   },
