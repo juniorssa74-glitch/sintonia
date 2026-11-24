@@ -184,6 +184,14 @@ a.pill{text-decoration:none;display:inline-block}
 .dlapp .ic svg{width:20px;height:20px}
 .dlapp .t{flex:1;min-width:0}.dlapp b{display:block;font-size:15px;font-weight:800}.dlapp i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px}
 .dlapp .go{flex:none;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:13px;padding:9px 14px;border-radius:999px}
+.welcome{display:flex;flex-direction:column;gap:14px;padding-top:28px;text-align:center}
+.welcome h1{font-size:28px;line-height:1.2}
+.favgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.favopt{display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--card);border-radius:22px;padding:18px 10px;box-shadow:var(--shadow);border:2px solid transparent}
+.favopt img,.favopt .ph{width:96px;height:96px;border-radius:50%;object-fit:cover}
+.favopt b{font-size:16px;font-weight:800}
+.favopt.on{border-color:var(--accent)}
+.favgo{width:100%;height:50px;border-radius:999px;margin-top:10px;font-size:16px}
 .acard{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:22px;padding:14px 18px;width:100%;text-align:left;margin-bottom:12px;box-shadow:var(--shadow)}
 .acard img,.acard .ph{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none}
 .acard .t{flex:1;min-width:0}
@@ -406,6 +414,7 @@ button.awrow{font:inherit;color:inherit;cursor:pointer}
 <script>
 /* ---------- ícones ---------- */
 const I = {
+  swap:'<svg class="ln" viewBox="0 0 24 24" style="width:16px;height:16px;stroke-width:2.2"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>',
   download:'<svg class="ln" viewBox="0 0 24 24" style="stroke-width:2.2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   play:'<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>',
   pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>',
@@ -538,6 +547,8 @@ const ES = {
   'Serviço de rádios indisponível. Tentando de novo…':'Servicio de radios no disponible. Reintentando…',
   'Não foi possível conectar ao serviço de rádios agora. Tentando de novo em 30s…':'No se pudo conectar al servicio de radios ahora. Reintentando en 30 s…',
   'Seguir':'Seguir', 'Seguindo':'Siguiendo', 'Podcast':'Podcast', 'Episódio':'Episodio', 'Rádio ao vivo':'Radio en vivo', 'No celular':'En el celular',
+  'Qual é o seu artista favorito?':'¿Cuál es tu artista favorito?', 'Continuar':'Continuar', 'Trocar':'Cambiar', 'Seu artista':'Tu artista', 'Escolha um artista':'Elige un artista',
+  'Dá para trocar depois, no botão Trocar da aba Streams.':'Puedes cambiarlo después con el botón Cambiar de la pestaña Streams.',
   'Baixar o app Sintonia':'Descargar la app Sintonia', 'Só funciona em Android · não funciona em iPhone':'Solo funciona en Android · no funciona en iPhone', 'Baixar':'Descargar',
   'Lançamento · streams em breve':'Lanzamiento · streams pronto', 'Novo':'Nuevo', 'LANÇAMENTO':'LANZAMIENTO', 'Streams em breve':'Streams pronto',
   'A música já está nos charts, mas ainda não aparece na lista de streams do Spotify do kworb, que costuma incluir lançamentos alguns dias depois. Quando entrar, os números aparecem aqui sozinhos.':'La canción ya está en los charts, pero aún no aparece en la lista de streams de Spotify de kworb, que suele incluir los lanzamientos unos días después. Cuando entre, los números aparecerán aquí solos.',
@@ -1222,14 +1233,10 @@ function itemList(items, kind, artistId, limit){
 Object.assign(Screens, {
   async streams(_, alive){
     view.innerHTML = `
-      <div class="top"><div style="flex:1;min-width:0"><span class="kicker" id="kick">Streams do Spotify</span><h1>Seus artistas</h1></div>
+      <div class="top"><div style="flex:1;min-width:0"><span class="kicker" id="kick">Streams do Spotify</span><h1>Seu artista</h1></div>
         <button class="roundbtn${notifGet() && notifOk() ? ' on' : ''}" id="bellBtn" aria-label="Notificações" aria-pressed="${notifGet() && notifOk()}">${I.bell}</button>
         <button class="roundbtn" id="langBtn" aria-label="Idioma" style="font-weight:800;font-size:13px">${LANG === 'es' ? 'ES' : 'PT'}</button>
-        <button class="roundbtn" id="addBtn" aria-label="Acompanhar artista">${I.plus}</button></div>
-      <div class="addbox" id="addbox" hidden>
-        <input id="aq" placeholder="Nome do artista ou link do Spotify" autocomplete="off">
-        <div id="ares"></div>
-      </div>
+        <button class="pill" id="favBtn" aria-label="Trocar artista favorito" style="display:flex;align-items:center;gap:6px;height:38px">${I.swap}Trocar</button></div>
       ${periodSeg()}
       <div id="alist">${phRows(3)}</div>
       ${window.Capacitor ? '' : `<a class="dlapp" href="https://github.com/juniorssa74-glitch/sintonia/releases/download/apk/Sintonia.apk" download>
@@ -1238,16 +1245,7 @@ Object.assign(Screens, {
     bindSeg(render);
     $('#langBtn').onclick = () => setLang(LANG === 'es' ? 'pt' : 'es');
     $('#bellBtn').onclick = notifToggle;
-    $('#addBtn').onclick = () => { const b = $('#addbox'); b.hidden = !b.hidden; if (!b.hidden) $('#aq').focus(); };
-    let t;
-    $('#aq').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
-      const q = $('#aq').value.trim(), box = $('#ares');
-      const link = q.match(/artist\/([A-Za-z0-9]{22})/) || q.match(/^([A-Za-z0-9]{22})$/);
-      const results = link ? [{id:link[1], name:'Artista do link'}] : (q.length < 2 ? [] : await searchIndex(q));
-      box.innerHTML = results.map((r,i) => `<div class="irow"><div class="avatar" style="width:40px;height:40px">${esc(r.name[0]||'?')}</div><div class="t"><b>${esc(r.name)}</b><i>${r.totalM ? fmtN(r.totalM*1e6)+' streams no total' : 'via link do Spotify'}</i></div><button class="btn" data-add="${i}">Acompanhar</button></div>`).join('')
-        || (q.length >= 2 ? '<p class="note" style="padding:10px 0">Nenhum artista encontrado. A busca cobre os ~3.000 maiores do Spotify. Para outros, cole o link do artista no Spotify.</p>' : '');
-      box.onclick = e => { const b = e.target.closest('[data-add]'); if (!b) return; const r = results[+b.dataset.add]; issueLink('Acompanhar', r.id, r.name); };
-    }, 300); };
+    $('#favBtn').onclick = () => go({type:'welcome'});
 
     try {
       const sum = await dataJSON('summary.json');
@@ -1260,7 +1258,10 @@ Object.assign(Screens, {
       const imgTag = (a, cls='') => `<img src="${pic(a.img)}" alt="" ${cls} onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">`;
       const lst = a => a.listeners ? ` · ${fmtN(a.listeners.value)} ouvintes` : '';
       const errLine = a => a.error ? `<span class="note" style="color:var(--bad);display:block;margin-top:2px">Última coleta falhou</span>` : '';
-      const list = artists.filter(a => !a.pending);
+      // só o artista favorito (escolhido na primeira abertura; o botão Trocar muda)
+      const all = artists.filter(a => !a.pending), fav = favGet();
+      const list = all.filter(a => a.id === fav);
+      if (all.length && !list.length) return Screens.welcome({}, alive);
       $('#alist').innerHTML = list.length ? list.map((a,i) => {
         const v = a.stats[p];
         if (i === 0) return `
@@ -1275,7 +1276,7 @@ Object.assign(Screens, {
           <div class="v"><strong>${fmtN(v.value)}</strong>${chg(v.change) || `<span class="note">${p === 'day' ? 'no dia' : v.complete ? 'no período' : 'parcial'}</span>`}</div>
         </button>`;
       }).join('') + `<div id="hot"></div>`
-        : `<div class="empty">Nenhum artista acompanhado ainda.<br><br><button class="btn" onclick="document.getElementById('addBtn').click()">Acompanhar um artista</button></div>`;
+        : `<p class="empty">Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.</p>`;
       $('#alist').onclick = e => {
         const s = e.target.closest('[data-song]'); if (s) return go({type:'streamItem', artistId:list[0].id, kind:'songs', id:s.dataset.song});
         const b = e.target.closest('[data-i]'); if (b) go({type:'streamArtist', id:list[+b.dataset.i].id}); };
@@ -1318,7 +1319,6 @@ Object.assign(Screens, {
           <a href="https://kworb.net/spotify/artist/${id}_songs.html" target="_blank" rel="noopener">Ver no kworb</a>
           <a href="https://chartmasters.org/spotify-streaming-numbers-tool/?artist_name=&artist_id=${id}" target="_blank" rel="noopener">Ver no Chartmasters</a>
           <a href="https://open.spotify.com/artist/${id}" target="_blank" rel="noopener">Abrir no Spotify</a>
-          <button class="danger" id="unf">Deixar de acompanhar</button>
         </div>
         ${kpis(st)}
         ${listenersCard(d.listeners)}
@@ -1343,7 +1343,6 @@ Object.assign(Screens, {
       view.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; limit = 30; q = ''; paint(); });
       $('#flt').oninput = e => { q = e.target.value; list(); };
       $('#items').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go({type:'streamItem', artistId:id, kind:tab, id:b.dataset.go}); };
-      $('#unf').onclick = () => issueLink('Remover', id, d.name);
       $('#more').onclick = () => { const m = $('#moreMenu'); m.hidden = !m.hidden; $('#more').setAttribute('aria-expanded', !m.hidden); };
       $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, 'artist')});
     };
@@ -2815,9 +2814,17 @@ async function notifEnable(on){
     if (perm.receive !== 'granted') perm = await P.requestPermissions();
     if (perm.receive !== 'granted') return false;
     await P.register();
-    await F.subscribeTo({ topic: 'sintonia-' + LANG });
-    await F.unsubscribeFrom({ topic: 'sintonia-' + (LANG === 'es' ? 'pt' : 'es') }).catch(() => {});
-  } else for (const l of ['pt', 'es']) await F.unsubscribeFrom({ topic: 'sintonia-' + l }).catch(() => {});
+    // um tópico por idioma e artista (só o favorito); sai dos outros e do tópico antigo, que recebia todos
+    const fav = favGet(), ids = await dataJSON('summary.json').then(s => s.artists.map(a => a.id)).catch(() => []);
+    if (fav) await F.subscribeTo({ topic: `sintonia-${LANG}-${fav}` });
+    for (const l of ['pt', 'es']) {
+      await F.unsubscribeFrom({ topic: 'sintonia-' + l }).catch(() => {});
+      for (const id of ids) if (l !== LANG || id !== fav) await F.unsubscribeFrom({ topic: `sintonia-${l}-${id}` }).catch(() => {});
+    }
+  } else {
+    const ids = await dataJSON('summary.json').then(s => s.artists.map(a => a.id)).catch(() => []);
+    for (const l of ['pt', 'es']) { await F.unsubscribeFrom({ topic: 'sintonia-' + l }).catch(() => {}); for (const id of ids) await F.unsubscribeFrom({ topic: `sintonia-${l}-${id}` }).catch(() => {}); }
+  }
   return true;
 }
 async function notifToggle(){
@@ -2839,6 +2846,34 @@ function notifInit(){
   });
   if (notifGet()) notifEnable(true).catch(() => {}); // reassina no idioma atual
 }
+/* ---------- artista favorito: escolhido na primeira abertura; Streams e notificações seguem ele ---------- */
+function favGet(){ try { return localStorage.getItem('fav') || null; } catch { return null; } }
+function favSet(id){ try { localStorage.setItem('fav', id); } catch {} }
+Screens.welcome = async function(_, alive){
+  const sub = S.stack.length > 0; // aberto pelo botão Trocar (tem Voltar)
+  view.innerHTML = `${sub ? `<button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>` : ''}
+    <div class="welcome"><span class="kicker">Sintonia</span><h1>Qual é o seu artista favorito?</h1>
+      <div class="favgrid" id="favgrid">${phRows(2)}</div>
+      <button class="btn favgo" id="favGo">Continuar</button>
+      <p class="note" style="text-align:center">Dá para trocar depois, no botão Trocar da aba Streams.</p></div>`;
+  let artists = [];
+  try { artists = (await dataJSON('summary.json')).artists.filter(a => !a.pending); } catch {}
+  if (!alive()) return;
+  let pick = favGet();
+  const paint = () => $('#favgrid').innerHTML = artists.map(a => `
+    <button class="favopt${a.id === pick ? ' on' : ''}" data-id="${a.id}" aria-pressed="${a.id === pick}">
+      <img src="${pic(a.img)}" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'"><b>${esc(a.name)}</b></button>`).join('')
+    || '<p class="empty">Ainda não há dados publicados.</p>';
+  paint();
+  $('#favgrid').onclick = e => { const b = e.target.closest('[data-id]'); if (b) { pick = b.dataset.id; paint(); } };
+  $('#favGo').onclick = () => {
+    if (!pick) return toast('Escolha um artista');
+    const changed = pick !== favGet();
+    favSet(pick);
+    if (changed && notifGet() && notifOk()) notifEnable(true).catch(() => {}); // notificações passam a ser do novo favorito
+    S.tab = 'streams'; S.stack = []; render();
+  };
+};
 const isWhatsApp = s => /whatsapp|com\.whatsapp|^(ptt|aud)-\d{8}-wa\d+/i.test(s);
 S.localTracks = null;
 function localItem(t){ return { kind:'local', id:'l'+t.id, title:t.title, sub:[t.artist, t.album].filter(Boolean).join(' · ') || 'No celular', art:LOCAL_ART, url:t.url, dur:t.duration/1000 }; }
