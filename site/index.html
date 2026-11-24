@@ -1340,7 +1340,7 @@ Object.assign(Screens, {
     try { d = await dataJSON(`artists/${artistId}/${kind}_${id}.json`); d.series = toSeries(d.series); } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Sem dados.</p>`; return; }
     if (!alive()) return;
     const isAlbum = kind === 'albums', fresh = !!d.fresh;
-    const spLink = fresh ? `https://open.spotify.com/search/${encodeURIComponent(`${d.artistName} ${d.name}`)}` : `https://open.spotify.com/${isAlbum?'album':'track'}/${id}`;
+    const spLink = fresh && d.spotifyId ? `https://open.spotify.com/track/${d.spotifyId}` : fresh ? `https://open.spotify.com/search/${encodeURIComponent(`${d.artistName} ${d.name}`)}` : `https://open.spotify.com/${isAlbum?'album':'track'}/${id}`;
     const paint = () => {
       const p = S.period;
       view.innerHTML = fresh ? `
