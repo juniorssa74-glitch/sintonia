@@ -1,0 +1,13 @@
+{
+  "name": "sintonia",
+  "version": "1.0.0",
+  "description": "App de música com acompanhamento diário de streams no Spotify",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js",
+    "collect": "node scripts/collect.js"
+  },
+  "devDependencies": {
+    "@vercel/analytics": "^1.4.1"
+  }
+}
