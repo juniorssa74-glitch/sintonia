@@ -829,6 +829,7 @@ function render(){
   view.scrollTop = 0;
   const top = S.stack[S.stack.length-1];
   const fn = top ? Screens[top.type] : Screens[S.tab];
+  $('#nav').style.display = ''; // a tela de escolha do artista esconde a barra
   fn(top || {}, () => id === renderId);
   if (window.VA_ON) { const r = '/' + (top ? top.type : S.tab); if (r !== lastVA) { lastVA = r; window.va('pageview', { route: r, path: r }); } }
 }
@@ -2637,7 +2638,8 @@ Screens.awards = async function(_, alive){
   let sum;
   try { sum = await dataJSON('summary.json'); } catch { if (alive()) view.innerHTML += '<p class="empty">Sem dados ainda.</p>'; return; }
   if (!alive()) return;
-  const artists = sum.artists;
+  // só o artista favorito (se ainda não escolheu, mostra todos)
+  const artists = sum.artists.filter(a => a.id === favGet()).length ? sum.artists.filter(a => a.id === favGet()) : sum.artists;
   if (!artists.length) { view.innerHTML = `<span class="kicker">Prêmios</span><h1>Awards</h1><p class="empty">Acompanhe um artista na aba Streams para ver os prêmios dele.</p>`; return; }
   let aid = store.get('awArtist', artists[0].id); if (!artists.some(a => a.id === aid)) aid = artists[0].id;
   const st = S.awSt ??= { res: 'all', group: store.get('awGroup', 'year'), type: 'all', q: '', limit: 120, src: 'wiki' };
@@ -2647,7 +2649,7 @@ Screens.awards = async function(_, alive){
     view.innerHTML = `
       <div class="top" style="margin-bottom:14px"><div style="flex:1"><span class="kicker">Prêmios</span><h1 style="font-size:28px">Awards</h1></div>
         <button class="btn" id="awImg" style="display:flex;align-items:center;gap:6px;height:40px" hidden>${I.img.replace('<svg', '<svg style="width:16px;height:16px"')}Criar imagem</button></div>
-      <div class="chips" id="awA" style="margin-bottom:16px">${artists.map(a => `<button class="chip ${a.id===aid?'on':''}" data-a="${a.id}">${esc(a.name)}</button>`).join('')}</div>
+      <div class="chips" id="awA" style="margin-bottom:16px${artists.length > 1 ? '' : ';display:none'}">${artists.map(a => `<button class="chip ${a.id===aid?'on':''}" data-a="${a.id}">${esc(a.name)}</button>`).join('')}</div>
       <div id="awBody">${phRows(5)}</div>`;
     $('#awA').onclick = e => { const b = e.target.closest('[data-a]'); if (!b || b.dataset.a === aid) return; aid = b.dataset.a; store.set('awArtist', aid); st.type = 'all'; st.q = ''; st.limit = 120; st.src = 'wiki'; st.res = 'all'; load(); };
   };
@@ -2851,6 +2853,7 @@ function favGet(){ try { return localStorage.getItem('fav') || null; } catch { r
 function favSet(id){ try { localStorage.setItem('fav', id); } catch {} }
 Screens.welcome = async function(_, alive){
   const sub = S.stack.length > 0; // aberto pelo botão Trocar (tem Voltar)
+  $('#nav').style.display = 'none'; // Streams e Prêmios só aparecem depois da escolha
   view.innerHTML = `${sub ? `<button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>` : ''}
     <div class="welcome"><span class="kicker">Sintonia</span><h1>Qual é o seu artista favorito?</h1>
       <div class="favgrid" id="favgrid">${phRows(2)}</div>
