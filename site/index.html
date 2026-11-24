@@ -2161,7 +2161,6 @@ function drawChartsImg(canvas, src, o, R){
 
   // rodapé
   ctx.textAlign = 'left'; ctx.fillStyle = MUT; ctx.font = `600 18px ${FONT}`;
-  ctx.fillText(`Fonte: ${src.svc === 'itunesLatin' ? 'LivePopBars' : 'kworb.net'} · ${src.svcLabel}`, M, H - 26);
   if (o.mark ?? 'Sintonia') { ctx.textAlign = 'right'; ctx.fillStyle = TXT; ctx.font = `800 20px ${FONT}`; ctx.fillText(o.mark ?? 'Sintonia', W - M, H - 26); }
 }
 
