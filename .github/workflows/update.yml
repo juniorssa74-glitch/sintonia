@@ -62,9 +62,9 @@ jobs:
           if [ "$OK" = "true" ]; then MSG="Feito! Os dados já estão no app (pode levar 1-2 min para o site atualizar)."; else MSG="Não consegui processar esse pedido — o artista existe no kworb.net? Veja o log da execução."; fi
           gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }} --comment "$MSG"
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
