@@ -443,8 +443,8 @@ const ES = {
   'Última coleta falhou':'La última recopilación falló', 'Nenhum artista acompanhado ainda.':'Todavía no sigues a ningún artista.', 'Em alta':'En tendencia',
   'Último dia disponível:':'Último día disponible:', 'Rodar coleta agora':'Recopilar ahora', 'Chave do GitHub':'Clave de GitHub',
   'Ainda não há dados publicados. A primeira coleta aparece aqui em alguns minutos.':'Aún no hay datos publicados. La primera recopilación aparece aquí en unos minutos.',
-  'Dia':'Día', 'Semana':'Semana', 'Mês':'Mes', 'Diário':'Diario', 'Semanal':'Semanal', 'Mensal':'Mensual', 'Hoje':'Hoy', '7 dias':'7 días', '30 dias':'30 días',
-  'Streams no dia':'Streams del día', 'Streams em 7 dias':'Streams en 7 días', 'Streams em 30 dias':'Streams en 30 días', 'Total no Spotify':'Total en Spotify',
+  'Dia':'Día', 'Semana':'Semana', 'Mês':'Mes', 'Diário':'Diario', 'Semanal':'Semanal', 'Mensal':'Mensual', 'Hoje':'Hoy', '7 dias':'7 días', '30 dias':'30 días', 'No mês':'En el mes', 'no mês':'en el mes',
+  'Streams no dia':'Streams del día', 'Streams em 7 dias':'Streams en 7 días', 'Streams em 30 dias':'Streams en 30 días', 'Streams no mês':'Streams del mes', 'Total no Spotify':'Total en Spotify',
   'no dia':'en el día', 'no período':'en el período', 'parcial':'parcial', 'desde a estreia':'desde el debut', 'no Spotify':'en Spotify',
   'Streams por dia':'Streams por día', 'Streams por semana':'Streams por semana', 'Streams por mês':'Streams por mes', 'Ver tabela':'Ver tabla', 'Ver gráfico':'Ver gráfico',
   'Barras claras = período ainda incompleto.':'Barras claras = período aún incompleto.', 'O gráfico ganha uma barra a cada dia coletado. Barras claras = período ainda incompleto.':'El gráfico suma una barra por cada día recopilado. Barras claras = período aún incompleto.',
@@ -563,7 +563,7 @@ const ES_RULES = [
   [/^chart de (.+)$/, 'chart del $1'],
   [/^atualizado (.+)$/, 'actualizado $1'],
   [/^Ver os (\d+) países$/, 'Ver los $1 países'],
-  [/^Ordenado por streams (.+)$/, (m, p) => 'Ordenado por streams ' + ({'no dia':'del día', 'em 7 dias':'en 7 días', 'em 30 dias':'en 30 días'}[p] || p)],
+  [/^Ordenado por streams (.+)$/, (m, p) => 'Ordenado por streams ' + ({'no dia':'del día', 'em 7 dias':'en 7 días', 'em 30 dias':'en 30 días', 'no mês':'del mes'}[p] || p)],
   [/^(▲|▼) (.+) vs\. anterior$/, '$1 $2 vs. anterior'],
   [/^Filtrar (álbuns|músicas)…$/, (m, k) => k === 'álbuns' ? 'Filtrar álbumes…' : 'Filtrar canciones…'],
   [/^Total: (.+) streams$/, 'Total: $1 streams'],
@@ -1055,7 +1055,7 @@ setInterval(() => { if (S.tab==='home' && !S.stack.length && !document.hidden) {
 
 <script>
 /* =================== STREAMS: acompanhamento diário =================== */
-const P = { day:{label:'Diário', short:'Hoje', days:1}, week:{label:'Semanal', short:'7 dias', days:7}, month:{label:'Mensal', short:'30 dias', days:30} };
+const P = { day:{label:'Diário', short:'Hoje', days:1}, week:{label:'Semanal', short:'7 dias', days:7}, month:{label:'Mensal', short:'No mês', days:30} };
 const nf = new Intl.NumberFormat('pt-BR');
 function fmtN(n){
   if (n == null) return '—';
@@ -1163,7 +1163,7 @@ function barChart(series, period, title){
 }
 
 const SEG_LABEL = {day:'Dia', week:'Semana', month:'Mês'};
-const PER_LABEL = {day:'Streams no dia', week:'Streams em 7 dias', month:'Streams em 30 dias'};
+const PER_LABEL = {day:'Streams no dia', week:'Streams em 7 dias', month:'Streams no mês'};
 function kpis(st){
   const p = S.period, v = st[p];
   return `<div class="kpis">
