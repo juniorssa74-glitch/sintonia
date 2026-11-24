@@ -9,6 +9,13 @@
   // Dentro do APK (Capacitor), carrega a ponte JS para usar compartilhar, arquivos e músicas do celular.
   if (window.Capacitor) document.write('<script src="https://cdn.jsdelivr.net/npm/@capacitor/core@7.6.9/dist/capacitor.js"><\/script>');
 </script>
+<script>
+  // Vercel Web Analytics: só no site da Vercel (no GitHub Pages / APK o endereço /_vercel não existe).
+  // Cada tela conta como uma página (/streams, /streamArtist, …), sem dados pessoais.
+  window.VA_ON = !/github\.io$|^localhost$|^127\./.test(location.hostname) && !window.Capacitor;
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  if (window.VA_ON) document.write('<script defer src="/_vercel/insights/script.js" data-disable-auto-track="1"><\/script>');
+</script>
 <meta name="description" content="Streams diários, semanais e mensais de artistas e álbuns no Spotify">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -807,7 +814,9 @@ function render(){
   const top = S.stack[S.stack.length-1];
   const fn = top ? Screens[top.type] : Screens[S.tab];
   fn(top || {}, () => id === renderId);
+  if (window.VA_ON) { const r = '/' + (top ? top.type : S.tab); if (r !== lastVA) { lastVA = r; window.va('pageview', { route: r, path: r }); } }
 }
+var lastVA = null; // var: render() pode rodar antes desta linha
 
 /* ---------- blocos de UI ---------- */
 const ph = n => Array.from({length:n}, () => '<div class="tile"><div class="ph"></div><b>&nbsp;</b></div>').join('');
