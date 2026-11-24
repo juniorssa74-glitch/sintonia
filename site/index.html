@@ -527,6 +527,8 @@ const ES = {
   'Serviço de rádios indisponível. Tentando de novo…':'Servicio de radios no disponible. Reintentando…',
   'Não foi possível conectar ao serviço de rádios agora. Tentando de novo em 30s…':'No se pudo conectar al servicio de radios ahora. Reintentando en 30 s…',
   'Seguir':'Seguir', 'Seguindo':'Siguiendo', 'Podcast':'Podcast', 'Episódio':'Episodio', 'Rádio ao vivo':'Radio en vivo', 'No celular':'En el celular',
+  'Lançamento · streams em breve':'Lanzamiento · streams pronto', 'Novo':'Nuevo', 'LANÇAMENTO':'LANZAMIENTO', 'Streams em breve':'Streams pronto',
+  'A música já está nos charts, mas ainda não aparece na lista de streams do Spotify do kworb, que costuma incluir lançamentos alguns dias depois. Quando entrar, os números aparecem aqui sozinhos.':'La canción ya está en los charts, pero aún no aparece en la lista de streams de Spotify de kworb, que suele incluir los lanzamientos unos días después. Cuando entre, los números aparecerán aquí solos.',
   'Escolha um álbum':'Elige un álbum', 'Imagem':'Imagen', 'vídeo':'video', 'imagem':'imagen', 'Forró':'Forró', 'Axé':'Axé', 'Pagode':'Pagode', 'Sertanejo':'Sertanejo', 'Eletrônica':'Electrónica',
 };
 // textos com números, datas e nomes (o trecho variável é mantido)
@@ -1251,13 +1253,14 @@ const badge = c => c == null ? '' : `<span class="badge2 ${c >= 0 ? 'up' : 'down
 /* ---------- lista de álbuns/músicas ---------- */
 function itemList(items, kind, artistId, limit){
   const p = S.period;
-  const sorted = items.slice().sort((a,b) => b.stats[p].value - a.stats[p].value);
+  // lançamentos (já nos charts, ainda sem streams no kworb) ficam no topo
+  const sorted = items.slice().sort((a,b) => (b.fresh?1:0) - (a.fresh?1:0) || b.stats[p].value - a.stats[p].value);
   return sorted.slice(0, limit).map((it,i) => `
     <button class="irow" data-go="${it.id}">
-      <span class="num">${i+1}</span>
+      <span class="num">${it.fresh ? '•' : i+1}</span>
       <img src="${pic(it.img)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
-      <div class="t"><b>${it.flag==='*'?'<span class="note">feat. · </span>':''}${esc(it.name)}${it.ch?`<span class="chb" title="Em ${it.ch} charts agora">${it.ch} charts</span>`:''}</b><i>Total ${fmtN(it.stats.total)}</i></div>
-      <div class="v"><b>${fmtN(it.stats[p].value)}</b>${chg(it.stats[p].change) || `<i>${P[p].short.toLowerCase()}</i>`}</div>
+      <div class="t"><b>${it.flag==='*'?'<span class="note">feat. · </span>':''}${esc(it.name)}${it.ch?`<span class="chb" title="Em ${it.ch} charts agora">${it.ch} charts</span>`:''}</b>${it.fresh ? '<i style="color:var(--accent);font-weight:700">Lançamento · streams em breve</i>' : `<i>Total ${fmtN(it.stats.total)}</i>`}</div>
+      <div class="v">${it.fresh ? '<span class="chb" style="margin:0">Novo</span>' : `<b>${fmtN(it.stats[p].value)}</b>${chg(it.stats[p].change) || `<i>${P[p].short.toLowerCase()}</i>`}`}</div>
     </button>`).join('');
 }
 
@@ -1322,12 +1325,12 @@ Object.assign(Screens, {
       // "Em alta" do primeiro artista
       if (list.length) dataJSON(`artists/${list[0].id}.json`).then(d => {
         if (!alive() || !$('#hot')) return;
-        const top = d.songs.slice().sort((x,y) => y.stats[p].value - x.stats[p].value).slice(0, 5);
+        const top = d.songs.slice().sort((x,y) => (y.fresh?1:0) - (x.fresh?1:0) || y.stats[p].value - x.stats[p].value).slice(0, 5);
         $('#hot').innerHTML = `<h2>Em alta <small>${esc(d.name)}</small></h2>` + top.map(s => `
           <button class="irow" data-song="${s.id}" style="border-bottom:1px solid var(--line)">
             <img src="${pic(s.img)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
             <div class="t"><b>${esc(s.name)}</b>${s.ch ? `<i style="color:var(--accent);font-weight:700">Em ${s.ch} ${s.ch===1?'chart':'charts'} agora</i>` : `<i>Total ${fmtN(s.stats.total)}</i>`}</div>
-            <div class="v"><b>${fmtN(s.stats[p].value)}</b>${chg(s.stats[p].change)}</div>
+            <div class="v">${s.fresh ? '<span class="chb" style="margin:0">Novo</span>' : `<b>${fmtN(s.stats[p].value)}</b>${chg(s.stats[p].change)}`}</div>
           </button>`).join('');
       }).catch(() => {});
       $('#foot').innerHTML = `Fonte: kworb.net (streams do Spotify, publicados 1x por dia).<br>Último dia disponível: <b>${last ? fmtDateLong(last) : '—'}</b> · dados gerados ${new Date(sum.generatedAt).toLocaleString(LOC(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · próxima verificação ~${nextCheck.toLocaleTimeString(LOC(),{hour:'2-digit',minute:'2-digit'})}.<br>Semanal e mensal são completos depois de 7 e 30 dias de coleta.
@@ -1395,10 +1398,20 @@ Object.assign(Screens, {
     let d;
     try { d = await dataJSON(`artists/${artistId}/${kind}_${id}.json`); d.series = toSeries(d.series); } catch { if (alive()) view.innerHTML = `<button class="back" onclick="back()">${I.back}</button><p class="empty">Sem dados.</p>`; return; }
     if (!alive()) return;
-    const isAlbum = kind === 'albums';
+    const isAlbum = kind === 'albums', fresh = !!d.fresh;
+    const spLink = fresh ? `https://open.spotify.com/search/${encodeURIComponent(`${d.artistName} ${d.name}`)}` : `https://open.spotify.com/${isAlbum?'album':'track'}/${id}`;
     const paint = () => {
       const p = S.period;
-      view.innerHTML = `
+      view.innerHTML = fresh ? `
+        <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
+        <div class="detail-head">
+          <img src="${pic(d.img)}" alt="" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;animation:none&quot;></div>'">
+          <div style="min-width:0"><span class="k">LANÇAMENTO</span><h1>${esc(d.name)}</h1>
+            <div class="sub">${esc(d.artistName)}</div></div>
+        </div>
+        <div class="chart"><h3>Streams em breve</h3><p class="note" style="margin:0;line-height:1.55">A música já está nos charts, mas ainda não aparece na lista de streams do Spotify do kworb, que costuma incluir lançamentos alguns dias depois. Quando entrar, os números aparecem aqui sozinhos.</p></div>
+        <div class="actions" style="flex-wrap:wrap;margin-top:0"><a class="pill" href="${spLink}" target="_blank" rel="noopener">Abrir no Spotify</a><button class="pill" id="prev">Ouvir prévia</button></div>
+        ${chartsBlock(d, false)}` : `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <button class="back" onclick="back()" aria-label="Voltar" style="margin:0">${I.back}</button>
           <button class="btn" id="mkimg" style="display:flex;align-items:center;gap:6px;height:40px">${I.img.replace('<svg', '<svg style="width:16px;height:16px"')}Criar imagem</button>
@@ -1415,10 +1428,10 @@ Object.assign(Screens, {
         ${chartsBlock(d, isAlbum)}
         ${isAlbum ? albumTrackCharts(d) : ''}
         ${isAlbum ? tracksBlock(d) : ''}`;
-      bindSeg(paint);
+      if (!fresh) bindSeg(paint);
       bindCharts(d);
       if (isAlbum) bindAlbumTrackCharts(d, artistId);
-      $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
+      if ($('#mkimg')) $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
       if ($('#tracks')) $('#tracks').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({type:'streamItem', artistId, kind:'songs', id:b.dataset.song}); };
       view.querySelectorAll('.kpi[data-p]').forEach(b => b.onclick = () => { S.period = b.dataset.p; store.set('period', S.period); paint(); });
       $('#prev').onclick = async () => {
