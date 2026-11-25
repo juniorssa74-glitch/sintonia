@@ -193,6 +193,8 @@ a.pill{text-decoration:none;display:inline-block}
 .hcard .num strong{display:block;font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1}
 .prog2{height:6px;border-radius:3px;background:var(--card2);overflow:hidden}
 .prog2 span{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.lgain.rows{grid-template-columns:1fr;gap:6px}.lgain.rows div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px}.lgain.rows span{font-size:12px}.lgain.rows b{margin:0;font-size:17px}
+.prbtn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;font-size:12px}
 .lgain{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.lgain div{background:var(--bg2);border-radius:14px;padding:9px 10px}.lgain div.on{box-shadow:inset 0 0 0 2px var(--accent-soft)}.lgain span{display:block;font-size:11px;color:var(--muted);font-weight:700}.lgain b{display:block;font-size:16px;font-weight:800;margin-top:2px}.lgain i{display:block;font-style:normal;font-size:10px;color:var(--muted)}
 .ldays{margin-top:12px;font-size:13px}.lrow{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}.lrow span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}.lrow.lh{font-size:11px;color:var(--muted);font-weight:700}.lrow span.up,.lrow span.down{font-weight:700}
 .badge2{padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap}
@@ -495,7 +497,7 @@ const ES = {
   'Lista de faixas não encontrada para este álbum.':'No se encontró la lista de canciones de este álbum.', 'chart semanal':'chart semanal',
   'Esta música':'Esta canción', 'Este álbum':'Este álbum', 'Charts de álbuns':'Charts de álbumes', 'Charts de músicas':'Charts de canciones',
   // Criar imagem
-  'Criar imagem':'Crear imagen', 'Modelo':'Modelo', 'Álbuns na tabela':'Álbumes en la tabla', 'Formato':'Formato', 'Imagem (PNG)':'Imagen (PNG)', 'Dimensão':'Tamaño', 'Capa':'Portada',
+  'Criar imagem':'Crear imagen', 'Streams diários':'Streams diarios', 'Variação':'Variación', 'Verde subiu · vermelho caiu':'Verde subió · rojo bajó', 'O gráfico aparece a partir do 2º dia de coleta.':'El gráfico aparece desde el 2º día de recolección.', 'Não consegui gerar o print':'No pude generar la captura', 'Gerar print':'Generar captura', 'Modelo':'Modelo', 'Álbuns na tabela':'Álbumes en la tabla', 'Formato':'Formato', 'Imagem (PNG)':'Imagen (PNG)', 'Dimensão':'Tamaño', 'Capa':'Portada',
   'Estilo':'Estilo', 'Período':'Período', "Marca d'água e foto":'Marca de agua y foto', 'Texto no canto da imagem (deixe vazio para tirar)':'Texto en la esquina de la imagen (déjalo vacío para quitarlo)',
   'Trocar foto':'Cambiar foto', 'Voltar à foto original':'Volver a la foto original', 'Use uma foto sua no lugar da capa.':'Usa una foto tuya en lugar de la portada.',
   'Escolha um ou mais (ex.: os dois volumes de uma era). Faixas repetidas aparecem uma vez.':'Elige uno o más (ej.: los dos volúmenes de una era). Las canciones repetidas aparecen una vez.',
@@ -1226,7 +1228,127 @@ function kpis(st){
 }
 // ouvintes mensais do Spotify (kworb, com reserva na página do artista)
 const lstChg = v => v == null ? '' : `<span class="badge2 ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '▲' : '▼'} ${nf.format(Math.abs(v))}</span>`;
-function listenersCard(L){
+// streams diários no mesmo formato do cartão de ouvintes (dia, 7 dias, mês, barras e dia a dia)
+const PRINTS = {};
+const sgn = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf.format(Math.abs(v));
+const updn = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+// streams de cada dia: diferença do total para o dia anterior (igual ao KPI); sem dia anterior, o número do kworb
+function dailyStreams(series){
+  const out = []; let prev = null;
+  for (const x of series || []) {
+    const cons = prev && (Date.parse(x.date) - Date.parse(prev.date)) === 864e5;
+    const v = cons && x.t != null && prev.t != null ? x.t - prev.t : x.d;
+    if (v != null) out.push([x.date, v]);
+    prev = x;
+  }
+  return out.map((x, i) => [x[0], x[1], i && Date.parse(x[0]) - Date.parse(out[i-1][0]) === 864e5 ? x[1] - out[i-1][1] : null]);
+}
+function printBtn(key){ return `<button class="pill prbtn" data-print="${key}" aria-label="Gerar print">${I.img.replace('<svg', '<svg style="width:15px;height:15px"')}Print</button>`; }
+function bindPrints(){ view.querySelectorAll('[data-print]').forEach(b => b.onclick = () => printCard(PRINTS[b.dataset.print]).catch(e => toast('Não consegui gerar o print'))); }
+function streamsCard(series, st, who){
+  const ds = dailyStreams(series); if (!ds.length || !st) return '';
+  const day = st.day;
+  const tiles = `<div class="lgain rows">${[['day','Hoje'],['week','7 dias'],['month','No mês']].map(([k, lab]) => { const g = st[k];
+      return `<div class="${S.period === k ? 'on' : ''}"><span>${lab}${k !== 'day' && g.covered < g.days ? `<i>${g.covered} de ${g.days} dias</i>` : ''}</span><b>${nf.format(g.value)}</b></div>`; }).join('')}</div>`;
+  const gs = ds.slice(-30);
+  let bars = `<p class="note" style="margin-top:10px">O gráfico aparece a partir do 2º dia de coleta.</p>`;
+  if (gs.length > 1) {
+    const W = 320, H = 70, mx = Math.max(1, ...gs.map(x => x[1])), bw = W / Math.max(gs.length, 7);
+    bars = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:70px;margin-top:12px" role="img" aria-label="Streams por dia">
+      <line x1="0" x2="${W}" y1="${H - 0.5}" y2="${H - 0.5}" stroke="var(--line)" stroke-width="1"/>
+      ${gs.map((x, i) => { const h = Math.max(1.5, x[1] / mx * (H - 4));
+        return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${Math.max(2, bw - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${x[2] == null || x[2] >= 0 ? 'var(--good)' : 'var(--bad)'}"><title>${fmtDate(x[0])}: ${nf.format(x[1])}</title></rect>`; }).join('')}
+      </svg><div class="note" style="display:flex;justify-content:space-between"><span>${fmtDate(gs[0][0])}</span><span>Verde subiu · vermelho caiu</span><span>${fmtDate(gs[gs.length-1][0])}</span></div>`;
+  }
+  const rows = ds.slice().reverse().slice(0, 14);
+  const list = `<div class="ldays"><div class="lrow lh"><span>Dia</span><span>Streams</span><span>Variação</span></div>
+    ${rows.map(x => `<div class="lrow"><span>${fmtDate(x[0])}</span><span>${nf.format(x[1])}</span><span class="${updn(x[2])}">${sgn(x[2])}</span></div>`).join('')}</div>`;
+  const key = 'st' + Math.random().toString(36).slice(2, 7);
+  PRINTS[key] = { ...who, title: 'Streams no Spotify', bigLabel: 'Streams no dia', big: day.value,
+    bigChg: day.change == null ? null : [`${day.change >= 0 ? '▲' : '▼'} ${pct(day.change)}`, day.change >= 0],
+    tiles: [['Hoje', nf.format(st.day.value), ''], ['7 dias', nf.format(st.week.value), st.week.covered < st.week.days ? `${st.week.covered} de ${st.week.days} dias` : ''], ['No mês', nf.format(st.month.value), st.month.covered < st.month.days ? `${st.month.covered} de ${st.month.days} dias` : '']],
+    bars: gs.map(x => [x[0], x[1], x[2] == null || x[2] >= 0]), diverging: false,
+    cols: ['Dia', 'Streams', 'Variação'], rows: rows.slice(0, 7).map(x => [fmtDate(x[0]), nf.format(x[1]), sgn(x[2]), x[2]]), date: ds[ds.length-1][0] };
+  return `<div class="chart"><h3 style="display:flex;align-items:center;justify-content:space-between">Streams diários ${printBtn(key)}</h3>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">
+      <b style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">${nf.format(day.value)}</b>${day.change == null ? '' : `<span class="badge2 ${day.change >= 0 ? 'up' : 'down'}">${day.change >= 0 ? '▲' : '▼'} ${pct(day.change)}</span>`}</div>
+    <p class="note" style="margin-top:8px"><span>Último dia disponível:</span> ${fmtDateLong(ds[ds.length-1][0])}</p>${tiles}${bars}${list}</div>`;
+}
+const pct = v => (Math.abs(v) * 100).toLocaleString(LOC(), { maximumFractionDigits: 1 }) + '%';
+function listenersPrint(L, who){
+  if (!L) return '';
+  const s = L.series || [], G = L.gain, key = 'ls' + Math.random().toString(36).slice(2, 7);
+  const t = k => G?.[k] ? [sgn(G[k].value), k !== 'day' && G[k].covered < G[k].days ? `${G[k].covered} de ${G[k].days} dias` : '', G[k].value] : ['—', ''];
+  PRINTS[key] = { ...who, title: 'Ouvintes mensais', bigLabel: 'Ouvintes mensais', big: L.value,
+    bigChg: L.change == null ? null : [`${L.change >= 0 ? '▲' : '▼'} ${nf.format(Math.abs(L.change))}`, L.change >= 0],
+    tiles: [['Hoje', ...t('day')], ['7 dias', ...t('week')], ['No mês', ...t('month')]],
+    bars: s.filter(x => x[2] != null).slice(-30).map(x => [x[0], x[2], x[2] >= 0]), diverging: s.some(x => x[2] < 0),
+    cols: ['Dia', 'Ouvintes', 'Ganho'], rows: s.slice().reverse().slice(0, 7).map(x => [fmtDate(x[0]), nf.format(x[1]), sgn(x[2]), x[2]]), date: s.length ? s[s.length-1][0] : null };
+  return printBtn(key);
+}
+
+// desenha o cartão numa imagem 1080 de largura, nas cores do tema atual (claro ou noturno)
+async function printCard(P){
+  if (!P) return;
+  await document.fonts?.ready;
+  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
+  const BG = v('--bg'), CARD = v('--card'), BG2 = v('--bg2'), TXT = v('--text'), MUT = v('--muted'), LINE = v('--line'), GOOD = v('--good'), BAD = v('--bad'), ACC = v('--accent');
+  const W = 1080, M = 64, rowH = 58;
+  const H = 1350 + Math.max(0, P.rows.length - 7) * rowH;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+  rr(ctx, M - 24, M - 24, W - 2*M + 48, H - 2*M + 8, 40); ctx.fillStyle = CARD; ctx.fill();
+  // topo: foto, nome e título
+  const im = await loadImg(P.img); let x0 = M + 8;
+  if (im) { ctx.save(); rr(ctx, x0, M + 8, 120, 120, P.round ? 60 : 22); ctx.clip(); coverDraw(ctx, im, x0, M + 8, 120, 120); ctx.restore(); x0 += 148; }
+  ctx.textAlign = 'left'; ctx.fillStyle = TXT; ctx.font = `800 52px ${FONT}`; ctx.fillText(clip(ctx, P.name || '', W - M - 8 - x0), x0, M + 66);
+  ctx.fillStyle = MUT; ctx.font = `600 30px ${FONT}`; ctx.fillText(clip(ctx, [P.sub, P.title].filter(Boolean).join(' · '), W - M - 8 - x0), x0, M + 110);
+  let y = M + 200;
+  // número grande
+  ctx.fillStyle = MUT; ctx.font = `700 30px ${FONT}`; ctx.fillText(P.bigLabel, M + 8, y);
+  ctx.fillStyle = TXT; ctx.font = `800 112px ${FONT}`; ctx.fillText(nf.format(P.big), M + 4, y + 112);
+  if (P.bigChg) { ctx.font = `800 34px ${FONT}`; const tw = ctx.measureText(P.bigChg[0]).width + 40, bx = W - M - 8 - tw;
+    rr(ctx, bx, y + 50, tw, 62, 31); ctx.fillStyle = P.bigChg[1] ? hexA(GOOD, .16) : hexA(BAD, .16); ctx.fill();
+    ctx.fillStyle = P.bigChg[1] ? GOOD : BAD; ctx.textAlign = 'center'; ctx.fillText(P.bigChg[0], bx + tw/2, y + 93); ctx.textAlign = 'left'; }
+  y += 160;
+  // três quadros
+  const tw = (W - 2*M - 16 - 2*20) / 3;
+  P.tiles.forEach(([lab, val, note, raw], i) => { const tx = M + 8 + i*(tw + 20);
+    rr(ctx, tx, y, tw, 150, 26); ctx.fillStyle = BG2; ctx.fill();
+    ctx.fillStyle = MUT; ctx.font = `700 26px ${FONT}`; ctx.fillText(lab, tx + 24, y + 44);
+    ctx.fillStyle = raw == null ? TXT : raw > 0 ? GOOD : raw < 0 ? BAD : TXT; ctx.font = `800 40px ${FONT}`; ctx.fillText(clip(ctx, val, tw - 40), tx + 24, y + 96);
+    if (note) { ctx.fillStyle = MUT; ctx.font = `600 22px ${FONT}`; ctx.fillText(note, tx + 24, y + 128); } });
+  y += 196;
+  // barras dos últimos 30 dias
+  const bh = 230, bars = P.bars, bx0 = M + 8, bW = W - 2*M - 16;
+  if (bars.length > 1) {
+    const mx = Math.max(1, ...bars.map(b => Math.abs(b[1]))), slot = bW / Math.max(bars.length, 7), mid = P.diverging ? y + bh/2 : y + bh;
+    ctx.fillStyle = LINE; ctx.fillRect(bx0, mid - 1, bW, 2);
+    bars.forEach((b, i) => { const h = Math.max(3, Math.abs(b[1]) / mx * (P.diverging ? bh/2 - 6 : bh - 8)), yy = b[1] >= 0 ? mid - h : mid;
+      rr(ctx, bx0 + i*slot + 3, yy, Math.max(4, slot - 6), h, Math.min(6, (slot - 6)/2, h/2)); ctx.fillStyle = b[2] ? GOOD : BAD; ctx.fill(); });
+    ctx.fillStyle = MUT; ctx.font = `600 22px ${FONT}`; ctx.fillText(fmtDate(bars[0][0]), bx0, y + bh + 36);
+    ctx.textAlign = 'right'; ctx.fillText(fmtDate(bars[bars.length-1][0]), bx0 + bW, y + bh + 36); ctx.textAlign = 'left';
+  } else { ctx.fillStyle = MUT; ctx.font = `600 26px ${FONT}`; ctx.fillText('O gráfico aparece a partir do 2º dia de coleta.', bx0, y + bh/2); }
+  y += bh + 80;
+  // dia a dia
+  const cx = [M + 8, W - M - 300, W - M - 8];
+  ctx.fillStyle = MUT; ctx.font = `700 24px ${FONT}`; ctx.fillText(P.cols[0], cx[0], y); ctx.textAlign = 'right'; ctx.fillText(P.cols[1], cx[1], y); ctx.fillText(P.cols[2], cx[2], y); ctx.textAlign = 'left';
+  y += 20;
+  for (const r of P.rows) {
+    ctx.fillStyle = LINE; ctx.fillRect(M + 8, y, W - 2*M - 16, 2); y += rowH;
+    ctx.fillStyle = TXT; ctx.font = `600 30px ${FONT}`; ctx.fillText(r[0], cx[0], y - 18);
+    ctx.textAlign = 'right'; ctx.font = `700 30px ${FONT}`; ctx.fillText(r[1], cx[1], y - 18);
+    ctx.fillStyle = r[3] > 0 ? GOOD : r[3] < 0 ? BAD : MUT; ctx.fillText(r[2], cx[2], y - 18); ctx.textAlign = 'left';
+  }
+  // rodapé
+  ctx.fillStyle = ACC; ctx.font = `800 26px ${FONT}`; ctx.fillText('Sintonia', M + 8, H - M - 12);
+  ctx.fillStyle = MUT; ctx.font = `600 24px ${FONT}`; ctx.textAlign = 'right'; ctx.fillText(P.date ? `Dados de ${fmtDateLong(P.date)}` : '', W - M - 8, H - M - 12); ctx.textAlign = 'left';
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  await exportBlob(blob, fileBase(`${P.name}-${P.title}`) + '.png', `${P.name} · ${P.title}`, 'print');
+}
+function hexA(c, a){ const m = /^#([0-9a-f]{6})$/i.exec(c); if (!m) return c; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+function listenersCard(L, who){
   if (!L) return '';
   const s = L.series || [], G = L.gain;
   const sg = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf.format(Math.abs(v));
@@ -1250,7 +1372,7 @@ function listenersCard(L){
   const list = rows.length ? `<div class="ldays"><div class="lrow lh"><span>Dia</span><span>Ouvintes</span><span>Ganho</span></div>
     ${rows.map(x => `<div class="lrow"><span>${fmtDate(x[0])}</span><span>${nf.format(x[1])}</span><span class="${cls(x[2])}">${sg(x[2])}</span></div>`).join('')}</div>` : '';
   const meta = [L.rank ? `#${L.rank} no mundo` : '', L.peak ? `pico ${fmtN(L.peak)}${L.peakRank ? ` (#${L.peakRank})` : ''}` : ''].filter(Boolean).join(' · ');
-  return `<div class="chart"><h3>Ouvintes mensais</h3>
+  return `<div class="chart"><h3 style="display:flex;align-items:center;justify-content:space-between">Ouvintes mensais ${listenersPrint(L, who)}</h3>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px">
       <b style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">${nf.format(L.value)}</b>${lstChg(L.change)}</div>
     ${meta ? `<p class="note" style="margin-top:8px">${meta}</p>` : ''}${tiles}${bars}${list}</div>`;
@@ -1358,7 +1480,7 @@ Object.assign(Screens, {
     let tab = 'songs', limit = 30, q = '';
     const paint = () => {
       const p = S.period, st = d.stats, br = d.breakdown;
-      const tot = br.lead.t + br.feat.t || 1;
+      const tot = br.lead.t + br.feat.t || 1, who = { name: d.name, sub: 'Artista', img: d.img, round: true };
       view.innerHTML = `
         <div class="hero-artist" style="background-image:url('${pic(d.img)}')">
           <button class="back" onclick="back()" aria-label="Voltar">${I.back}</button>
@@ -1375,7 +1497,8 @@ Object.assign(Screens, {
           <a href="https://open.spotify.com/artist/${id}" target="_blank" rel="noopener">Abrir no Spotify</a>
         </div>
         ${kpis(st)}
-        ${listenersCard(d.listeners)}
+        ${streamsCard(d.series, st, who)}
+        ${listenersCard(d.listeners, who)}
         ${periodSeg()}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
         <div class="chart"><h3>De onde vêm os streams (total)</h3>
@@ -1399,6 +1522,7 @@ Object.assign(Screens, {
       $('#items').onclick = e => { const b = e.target.closest('[data-go]'); if (b) go({type:'streamItem', artistId:id, kind:tab, id:b.dataset.go}); };
       $('#more').onclick = () => { const m = $('#moreMenu'); m.hidden = !m.hidden; $('#more').setAttribute('aria-expanded', !m.hidden); };
       $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, 'artist')});
+      bindPrints();
     };
     paint();
   },
@@ -1432,6 +1556,7 @@ Object.assign(Screens, {
             <div class="sub">${esc(d.artistName)} · ${d.days} ${d.days===1?'dia coletado':'dias coletados'}</div></div>
         </div>
         ${kpis(d.stats)}
+        ${streamsCard(d.series, d.stats, { name: d.name, sub: d.artistName, img: d.img })}
         <div class="actions" style="flex-wrap:wrap;margin-top:0"><a class="pill" href="https://open.spotify.com/${isAlbum?'album':'track'}/${id}" target="_blank" rel="noopener">Abrir no Spotify</a><button class="pill" id="prev">Ouvir prévia</button></div>
         ${periodSeg()}
         ${barChart(d.series, p, p==='day' ? 'Streams por dia' : p==='week' ? 'Streams por semana' : 'Streams por mês')}
@@ -1440,6 +1565,7 @@ Object.assign(Screens, {
         ${isAlbum ? tracksBlock(d) : ''}`;
       if (!fresh) bindSeg(paint);
       bindCharts(d);
+      bindPrints();
       if (isAlbum) bindAlbumTrackCharts(d, artistId);
       if ($('#mkimg')) $('#mkimg').onclick = () => go({type:'share', src: shareSource(d, isAlbum ? 'album' : 'song')});
       if ($('#tracks')) $('#tracks').onclick = e => { const b = e.target.closest('[data-song]'); if (b) go({type:'streamItem', artistId, kind:'songs', id:b.dataset.song}); };
