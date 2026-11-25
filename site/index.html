@@ -273,7 +273,7 @@ a.pill{text-decoration:none;display:inline-block}
 .crow .d{text-align:right;font-size:12px;font-weight:700}
 .crow .d.up{color:var(--good)} .crow .d.down{color:var(--bad)} .crow .d.ne{color:var(--new)} .crow .d.eq{color:var(--muted)}
 .crow.thead{min-height:32px;font-size:11px;color:var(--muted);font-weight:700}
-.crow.st{grid-template-columns:30px 1fr 46px 62px 52px}
+.crow.st{grid-template-columns:30px 1fr 44px 80px 48px}
 .crow .sv{text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .crow.thead .sv{font-size:11px}
 .crow .fl{line-height:0;display:flex;align-items:center}
@@ -1463,7 +1463,7 @@ function chartList(c){
   if (!rows.length) return `<p class="note" style="padding:14px 0">Nenhum país encontrado para “${esc(chartQ)}”.</p>`;
   return `<div class="cbox">
     <div class="crow thead${st ? ' st' : ''}"><span></span><span>País</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span>${st ? '<span class="sv">Streams</span>' : ''}<span class="d">24h</span></div>
-    ${shown.map(([cc, name, pos, ch, s]) => `<div class="crow${st ? ' st' : ''}"><span class="fl" title="${esc((cc || '').toUpperCase())}">${chartFlag(cc)}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${st ? `<span class="sv">${s ? fmtN(s) : '—'}</span>` : ''}${chartDelta(ch)}</div>`).join('')}
+    ${shown.map(([cc, name, pos, ch, s]) => `<div class="crow${st ? ' st' : ''}"><span class="fl" title="${esc((cc || '').toUpperCase())}">${chartFlag(cc)}</span><span>${esc(regionName(cc, name))}</span><span class="pos">#${pos}</span>${st ? `<span class="sv">${s ? nf.format(s) : '—'}</span>` : ''}${chartDelta(ch)}</div>`).join('')}
     </div>
     ${rows.length > shown.length ? `<button class="btn ghost" id="call" style="margin-top:10px;width:100%;height:44px;border-radius:14px">Ver os ${rows.length} países</button>` : ''}`;
 }
@@ -1523,7 +1523,7 @@ function atcList(tr){
     const st = rows.some(x => x.r[4]);
     return `<div class="cbox">
       <div class="crow thead atc${st ? ' st' : ''}"><span></span><span>Faixa</span><span class="pos" style="font-size:11px;font-weight:700">Posição</span>${st ? '<span class="sv">Streams</span>' : ''}<span class="d">24h</span></div>
-      ${rows.map(({ t, r }) => `<button class="crow${st ? ' st' : ''} atrow" data-song="${t.id}"><span class="fl"><img class="atimg" src="${pic(t.img || atcFb)}" alt="" loading="lazy"></span><span class="atn">${esc(t.name)}</span><span class="pos">#${r[2]}</span>${st ? `<span class="sv">${r[4] ? fmtN(r[4]) : '—'}</span>` : ''}${chartDelta(r[3])}</button>`).join('')}
+      ${rows.map(({ t, r }) => `<button class="crow${st ? ' st' : ''} atrow" data-song="${t.id}"><span class="fl"><img class="atimg" src="${pic(t.img || atcFb)}" alt="" loading="lazy"></span><span class="atn">${esc(t.name)}</span><span class="pos">#${r[2]}</span>${st ? `<span class="sv">${r[4] ? nf.format(r[4]) : '—'}</span>` : ''}${chartDelta(r[3])}</button>`).join('')}
     </div>`;
   }
   const list = tr.slice().sort((a, b) => b.sp.length - a.sp.length || Math.min(...a.sp.map(r => r[2])) - Math.min(...b.sp.map(r => r[2])));
@@ -2113,7 +2113,7 @@ function drawChartsImg(canvas, src, o, R){
   const cards = [
     ['PAÍSES', nf.format(all.length), src.total && src.total !== all.length ? `de ${src.total}` : ''],
     ['MELHOR POSIÇÃO', best ? `#${best[2]}` : '—', best ? regionName(best[0], best[1]) : ''],
-    st ? ['STREAMS NO DIA', fmtN(sumS), 'soma dos países'] : ['NO TOP 10', nf.format(top10), top10 === 1 ? 'país' : 'países'],
+    st ? ['STREAMS NO DIA', nf.format(sumS), 'soma dos países'] : ['NO TOP 10', nf.format(top10), top10 === 1 ? 'país' : 'países'],
   ];
   cards.forEach(([lab, val, sub], i) => {
     const x = M + i * (cw + gap);
